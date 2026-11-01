@@ -13,7 +13,7 @@ The simulation study has three aims: to compare specification recovery with the 
 \item \emph{DGP-C (varying dispersion).} No random parameters. The dispersion depends on a binary covariate, $\log r_{it}=\log r-0.7\,x_{it,11}$. By Corollary~\ref{cor:confounding}(iii) this is the setting in which a spurious random parameter on $x_{11}$ is expected in cross-sectional data but not in panel data.
 \item \emph{DGP-D (zero-mean heterogeneity).} As DGP-A, plus a random parameter with zero mean on $x_5$, $(\beta_5,\sigma_5)=(0,0.25)$, to compare strong and weak heredity.
 \end{itemize}
-The factors varied are the number of sites $n\in\{300,1000\}$ and the number of periods $T\in\{1,5\}$, with dispersion $r=1$ and correlation $\rho=0.5$. Each of the four cells has 100 replications. \tbd{Extend to $r=5$ and $\rho=0$, and to DGP-B to DGP-D.}
+The factors varied are the number of sites $n\in\{300,1000\}$ and the number of periods $T\in\{1,5\}$, with dispersion $r=1$ and correlation $\rho=0.5$. Each of the four cells has 100 replications. \tbd{Extend DGP-A to $r=5$ and $\rho=0$, and run DGP-D.}
 
 \subsection{Methods compared}
 
@@ -51,9 +51,9 @@ Table~\ref{tab:sim-recovery} and Figure~\ref{fig:detection} summarize specificat
 
 \paragraph{Estimation} Table~\ref{tab:sim-estimation} reports errors for the three true random parameters without conditioning on selection. The means are estimated about equally well by all methods. For the standard deviations, the 95\% intervals of M4 cover the true value in 81\% to 94\% of cases, while those of M1 cover it in only 16\% ($n=300$, $T=1$) to 64\% ($n=300$, $T=5$) of cases outside the largest panel, because a parameter that M1 fixes receives a degenerate interval at zero. Averaging over specifications propagates selection uncertainty into the intervals.
 
-\paragraph{Flexible mean and computation} Adding squared covariates as fixed-only candidates (M5) changes little under DGP-A, where there is no curvature, except that it further reduces the inclusion of null covariates ($0.03$ against $0.08$ at $n=300$, $T=1$). Its value under omitted curvature is the subject of DGP-B. The proposed sampler takes between 8 and 46 seconds per data set on one core, against 1 to 26 seconds for M1.
+\paragraph{Flexible mean and computation} Adding squared covariates as fixed-only candidates (M5) changes little under DGP-A, where there is no curvature, except that it further reduces the inclusion of null covariates ($0.03$ against $0.08$ at $n=300$, $T=1$). Its value under omitted curvature is the subject of DGP-B. The proposed sampler takes between 8 and 46 seconds per data set on one core, against 1 to 26 seconds for M1, 0.5 to 69 seconds for M3 and 11 to 254 seconds for M2, whose screening and one-at-a-time comparisons require about ten Bayesian fits per data set.
 
-\paragraph{Other procedures} \tbd{Insert M2 (sequential Bayesian with DIC) and M3 (BIC search) results when the run completes. Pilot evidence: on panel data, one-at-a-time DIC comparisons declare nearly every retained covariate random, because a random coefficient on any uncentered covariate absorbs site-level heterogeneity that the all-fixed comparison model lacks, and the BIC search is competitive in the largest panel.}
+\paragraph{Other procedures} The sequential Bayesian procedure M2 performs worst in panel data. It declares 86\% ($n=300$) and all ($n=1000$) of the true fixed effects random, never recovers the full specification, and its false discovery proportion for random parameters exceeds $0.6$. The cause is the comparison it relies on. Each random parameter is compared with a model in which every parameter is fixed, so a random coefficient on any uncentered covariate absorbs site-level heterogeneity that the comparison model lacks and lowers the conditional DIC. In cross-sectional data the effect is smaller but present, with fixed effects declared random in 10\% and 36\% of cases. The BIC search M3 is the strongest competitor. It is conservative: fixed effects are declared random in at most 5\% of cases and few null covariates are included. It detects fewer random parameters than M4 under the median rule ($0.22$ to $0.91$ against $0.32$ to $0.99$), and recovers the full specification in the largest panel in 37\% of replications, against 60\% for M4 and 70\% for M4 with the FDR rule. Against M4 with the FDR rule, whose error rates are similar, M3 detects more random parameters in the smaller designs ($0.51$ against $0.41$ at $n=300$, $T=5$, and $0.33$ against $0.21$ at $n=1000$, $T=1$). Because it reports a single specification, its 95\% intervals for $|\sigma_j|$ cover the true value in only 21\% to 84\% of cases, against 81\% to 94\% for M4.
 
 \begin{table}[!htbp]
 \centering
@@ -157,7 +157,11 @@ Method & RMSE & Cover. & RMSE & Cover. & RMSE & Cover. & RMSE & Cover. \\
 
 DGP-B and DGP-C have no random parameters, so any parameter declared random is spurious. They test the two mechanisms of Corollary~\ref{cor:confounding}: a convex effect of $x_1$ omitted from a linear mean (DGP-B), and a dispersion that depends on $x_{11}$ (DGP-C). We use $n=1000$ sites with $T=1$ and $T=5$ and 100 replications per design.
 
-\tbd{BC-TEXT}
+Table~\ref{tab:sim-spurious} and Figure~\ref{fig:spurious} report the results.
+
+\paragraph{Omitted curvature} Under DGP-B the target covariate $x_1$ is declared random in 72\% of the cross-sectional replications by M1 and in 51\% by M4, whose posterior probability that $x_1$ is random averages $0.53$. Panel data make matters worse rather than better: $x_1$ is declared random in every panel replication by M1 and in 98\% by M4. This is the mechanism described after Proposition~\ref{prop:panel}. Because $x_1$ is constant within a site, the omitted term is the same in every period, and the site-specific draw of the random parameter absorbs it. Adding the squared covariates as fixed-only candidates removes the problem. M5 declares $x_1$ random in 6\% of the cross-sectional and in none of the panel replications, and it selects the squared term of $x_1$ in 99\% and 100\% of them.
+
+\tbd{C-TEXT}
 
 \IfFileExists{tables/dgpBC_spurious_rows.tex}{%
 \begin{table}[!htbp]
