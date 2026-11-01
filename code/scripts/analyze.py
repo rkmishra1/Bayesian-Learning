@@ -18,6 +18,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
+import sys  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from rpsel.summaries import fdr_select  # noqa: E402
 
 # ----------------------------------------------------------------------------- style
 # Reference palette from the dataviz skill. The five method colours were validated for
@@ -371,7 +375,7 @@ def table_recovery(summ: pd.DataFrame, tabdir: Path, reps: int):
         sty = METHODS[m]
         sub = summ[summ.method == m].set_index(["n", "T"])
         for i, (col, lab) in enumerate(rows):
-            head = f"\\multirow{{{len(rows)}}}{{*}}{{{sty['label']}}}" if i == 0 else ""
+            head = f"\\multirow{{{len(rows)}}}{{*}}{{\\shortstack[l]{{{sty['label'].replace(' ', '\\\\ ', 1)}}}}}" if i == 0 else ""
             vals = " & ".join(f"{sub.loc[tuple(d), col]:.2f}" for d in designs)
             L.append(f"{head} & {lab} & {vals} \\\\")
         L.append("\\midrule")
@@ -402,6 +406,40 @@ def table_estimation(est: pd.DataFrame, tabdir: Path):
     (tabdir / "dgpA_estimation_rows_n1000.tex").write_text("\n".join(L2) + "\n")
 
 
+def table_rules(recs, tabdir: Path, out: Path):
+    """Median probability rule versus Bayesian FDR control (q = 0.10, 0.05) for M4 and M5."""
+    rows = []
+    for r in recs:
+        t = np.array(r["true_states"])
+        for m in ("M4", "M5"):
+            if m not in r:
+                continue
+            Pm = np.array(r[m]["P"])
+            for rule, q in (("median", None), ("FDR 0.10", 0.10), ("FDR 0.05", 0.05)):
+                s = np.array(r[m]["states"]) if q is None else fdr_select(Pm, q)
+                nR = int((s == 2).sum())
+                rows.append(dict(method=m, rule=rule, n=r["n"], T=r["T"],
+                                 exact=float(np.all(s == t)), R_tpr=float(np.mean(s[t == 2] == 2)),
+                                 R_on_fixed=float(np.mean(s[t == 1] == 2)),
+                                 R_fdp=float(((s == 2) & (t != 2)).sum() / max(nR, 1))))
+    d = pd.DataFrame(rows).groupby(["method", "rule", "n", "T"]).mean().reset_index()
+    d.to_csv(out / "decision_rules.csv", index=False)
+    designs = d[["n", "T"]].drop_duplicates().sort_values(["n", "T"]).values.tolist()
+    L = []
+    measures = [("R_tpr", "TPR (R)"), ("R_on_fixed", "Fixed declared R"), ("R_fdp", "FDP (R)"),
+                ("exact", "Exact recovery")]
+    rules = [("median", "Median"), ("FDR 0.10", "FDR, $q=0.10$"), ("FDR 0.05", "FDR, $q=0.05$")]
+    for col, mlab in measures:
+        for i, (rule, rlab) in enumerate(rules):
+            sub = d[(d.method == "M4") & (d.rule == rule)].set_index(["n", "T"])
+            head = f"\\multirow{{3}}{{*}}{{{mlab}}}" if i == 0 else ""
+            vals = " & ".join(f"{sub.loc[tuple(dd), col]:.2f}" for dd in designs)
+            L.append(f"{head} & {rlab} & {vals} \\\\")
+        L.append("\\midrule")
+    (tabdir / "dgpA_rules_rows.tex").write_text("\n".join(L[:-1]) + "\n")
+    return d
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", default="results/dgpA/raw")
@@ -430,6 +468,7 @@ def main():
     fig_state_probs(recs, figdir)
     table_recovery(summ, tabdir, reps)
     table_estimation(est, tabdir)
+    rules = table_rules(recs, tabdir, out)
     # agreement of the median probability rule with the argmax rule (Section 3.5 claim)
     for m in ("M4", "M5"):
         dis, tot = 0, 0

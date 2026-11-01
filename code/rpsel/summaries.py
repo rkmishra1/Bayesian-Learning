@@ -30,6 +30,25 @@ def decide_states(trace, rule: str = "median") -> np.ndarray:
     return s
 
 
+def fdr_select(P: np.ndarray, q: float = 0.10) -> np.ndarray:
+    """Decision with Bayesian false discovery rate control for the claim 'random'.
+
+    P is the (p, 3) matrix of state probabilities. Candidates are declared random in
+    decreasing order of P(R) while the estimated FDR, the mean of 1 - P(R) over the
+    declared set, stays at or below q (Newton et al., 2004). The remaining candidates are
+    fixed if P(F) + P(R) > 1/2 and excluded otherwise.
+    """
+    pR = P[:, 2]
+    order = np.argsort(-pR)
+    chosen = np.array([], dtype=int)
+    for k in range(1, pR.size + 1):
+        if np.mean(1.0 - pR[order[:k]]) <= q:
+            chosen = order[:k]
+    s = np.where(P[:, 1] + P[:, 2] > 0.5, 1, 0)
+    s[chosen] = 2
+    return s
+
+
 def effect_summaries(trace, level: float = 0.95) -> dict:
     """Model-averaged posterior means and equal-tailed intervals for beta_j and |sigma_j|."""
     a = (1 - level) / 2

@@ -44,6 +44,10 @@
 \newcommand{\bomega}{\bm{\omega}}
 \newcommand{\state}{S}
 \newcommand{\tbd}[1]{\todo[inline,color=red!15]{#1}}
+%% Rows of generated tables are read with the TeX primitive so they can sit inside tabular
+\makeatletter
+\newcommand{\tablerows}[1]{\@@input #1 }
+\makeatother
 
 \journal{Transportation Research Part B: Methodological}
 

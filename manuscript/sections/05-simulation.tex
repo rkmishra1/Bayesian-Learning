@@ -8,7 +8,7 @@ The simulation study has three aims: to compare specification recovery with the 
 
 \paragraph{True structures} Four data-generating processes (DGPs) are used.
 \begin{itemize}[leftmargin=*]
-\item \emph{DGP-A (heterogeneous effects).} Three random parameters, $(\beta_1,\sigma_1)=(0.3,0.25)$ and $(\beta_2,\sigma_2)=(-0.3,0.25)$ on continuous covariates and $(\beta_{11},\sigma_{11})=(0.4,0.5)$ on a binary covariate. Because the continuous covariates are not centered, the random component $\sigma_jx_{itj}z_{ij}$ grows with $|x_{itj}|$. With $\sigma_j=0.5$ on the continuous covariates the simulated counts were unrealistic (a maximum above 2{,}000 against a mean of two), so we use $\sigma_j=0.25$, for which the random part has an average standard deviation of about $0.6$ on the log scale and the 99.9th percentile of the counts is below 50. This choice was made on these grounds before any method was compared. Four fixed effects, $\beta_3=0.3$, $\beta_4=-0.2$, $\beta_{12}=0.3$, $\beta_{13}=-0.3$. The other thirteen candidates are excluded.
+\item \emph{DGP-A (heterogeneous effects).} Three random parameters: on the continuous covariates $x_1$ and $x_2$ with means $0.3$ and $-0.3$ and standard deviation $0.25$, and on the binary covariate $x_{11}$ with mean $0.4$ and standard deviation $0.5$. Because the continuous covariates are not centered, the random component $\sigma_jx_{itj}z_{ij}$ grows with $|x_{itj}|$. With $\sigma_j=0.5$ on the continuous covariates the simulated counts were unrealistic (a maximum above 2{,}000 against a mean of two), so we use $\sigma_j=0.25$, for which the random part has an average standard deviation of about $0.6$ on the log scale and the 99.9th percentile of the counts is below 50. This choice was made on these grounds before any method was compared. Four fixed effects, $\beta_3=0.3$, $\beta_4=-0.2$, $\beta_{12}=0.3$, $\beta_{13}=-0.3$. The other thirteen candidates are excluded.
 \item \emph{DGP-B (omitted curvature).} No random parameters. Covariate $x_1$ has a convex effect, $0.3x_1+0.15x_1^2$, and the fixed effects are as in DGP-A. By Corollary~\ref{cor:confounding}(ii) this is the setting in which a linear specification is expected to produce a spurious random parameter on $x_1$.
 \item \emph{DGP-C (varying dispersion).} No random parameters. The dispersion depends on a binary covariate, $\log r_{it}=\log r-0.7\,x_{it,11}$. By Corollary~\ref{cor:confounding}(iii) this is the setting in which a spurious random parameter on $x_{11}$ is expected in cross-sectional data but not in panel data.
 \item \emph{DGP-D (zero-mean heterogeneity).} As DGP-A, plus a random parameter with zero mean on $x_5$, $(\beta_5,\sigma_5)=(0,0.25)$, to compare strong and weak heredity.
@@ -25,7 +25,7 @@ The factors varied are the number of sites $n\in\{300,1000\}$ and the number of 
 \item \emph{Proposed, flexible mean.} As (M4), with the squares of the continuous covariates added as fixed-only candidates (Remark~\ref{rem:practice}).
 \item \emph{Proposed, weak heredity.} As (M5) with $\pi_{\sigma0}\sim\Betad(1,9)$, used in DGP-D.
 \end{enumerate}
-The proposed methods use the default hyperparameters of Section~\ref{sec:prior}, one chain of 3{,}000 iterations of which the first 1{,}000 are discarded, and the median probability rule of Section~\ref{sec:summaries}. In pilot runs, two chains started from different seeds gave posterior state probabilities that agreed to within about $0.1$. In M5 the squared covariates are scaled by their standard deviations but not centered. \tbd{Add an oracle fit at the true specification as a benchmark for estimation accuracy.}
+The proposed methods use the default hyperparameters of Section~\ref{sec:prior}, one chain of 3{,}000 iterations of which the first 1{,}000 are discarded, and the median probability rule of Section~\ref{sec:summaries}. For the first data set of each design, two chains started from different seeds gave posterior state probabilities whose largest difference across candidates was between $0.04$ and $0.14$, with mean absolute differences between $0.01$ and $0.05$. In M5 the squared covariates are scaled by their standard deviations but not centered. \tbd{Add an oracle fit at the true specification as a benchmark for estimation accuracy.}
 
 \subsection{Performance measures}
 
@@ -41,7 +41,19 @@ The proposed methods use the default hyperparameters of Section~\ref{sec:prior},
 
 \subsection{Results}
 
-\tbd{RESULTS-TEXT}
+Table~\ref{tab:sim-recovery} and Figure~\ref{fig:detection} summarize specification recovery, and Figure~\ref{fig:heatmap} breaks it down by candidate. Three patterns stand out.
+
+\paragraph{Panel data} With five periods per site, the proposed methods recover the specification far more often than the sequential procedure. At $n=1000$ the entire state vector is correct in 60\% (M4) and 58\% (M5) of replications, against 1\% for M1. The difference comes mainly from the null candidates: M1 includes 19\% of them, M4 only 1\%. The screening step of M1 treats the five observations of a site as independent, so its standard errors are too small and null covariates survive, whereas the proposed model accounts for the shared site draws throughout. With $n=300$ sites the same ordering holds at a lower level: three-state accuracy is $0.88$ for M4 against $0.82$ for M1, the share of true random parameters detected is $0.74$ against $0.68$, and null inclusion is $0.02$ against $0.16$.
+
+\paragraph{Cross-sectional data} With one observation per site no method recovers the specification, as Proposition~\ref{prop:cross} leads one to expect. The proposed methods detect more of the true random parameters ($0.32$ against $0.20$ at $n=300$ and $0.64$ against $0.54$ at $n=1000$ for M4 and M1), but three-state accuracy is similar for all methods ($0.69$ to $0.71$ at $n=300$ and $0.84$ to $0.85$ at $n=1000$). Figure~\ref{fig:stateprobs} shows why: in the cross-sectional data set the posterior spreads its mass between the fixed and random states of the true random parameters, while in the panel data set from the same process these parameters have posterior probability of being random of $0.94$ or more.
+
+\paragraph{Fixed effects declared random} The proposed methods declare a true fixed effect random somewhat more often than M1 under the median probability rule ($0.09$ to $0.12$ for M4 against $0.05$ to $0.08$). Figure~\ref{fig:heatmap} shows that these errors concentrate on $x_3$ and $x_{12}$, which have correlation $0.5$ with the random parameters $x_2$ and $x_{11}$, and on $x_{13}$ in the largest panel. Because the variance function in Proposition~\ref{prop:cross} depends on squared covariates, correlated candidates compete to explain the same heterogeneity. Figure~\ref{fig:calibration} shows the consequence for the posterior probabilities. They are close to calibrated in the cross-sectional designs, but in the panel designs candidates with $P_j(\mathrm{R})$ between $0.1$ and $0.6$ are almost never random: evidence that a parameter is exactly fixed accumulates slowly, and these probabilities overstate heterogeneity. The Bayesian false discovery rate rule of Section~\ref{sec:summaries} corrects this (Table~\ref{tab:sim-rules}). With a target of $q=0.10$ the realized false discovery proportion is between $0.01$ and $0.03$, fixed effects are declared random in at most 3\% of cases, and exact recovery in the largest panel rises to $0.70$. The price is lower detection in the small and cross-sectional designs. The median rule is therefore the better choice for exploration and the FDR rule for claims that heterogeneity is present.
+
+\paragraph{Estimation} Table~\ref{tab:sim-estimation} reports errors for the three true random parameters without conditioning on selection. The means are estimated about equally well by all methods. For the standard deviations, the 95\% intervals of M4 cover the true value in 81\% to 94\% of cases, while those of M1 cover it in only 16\% ($n=300$, $T=1$) to 64\% ($n=300$, $T=5$) of cases outside the largest panel, because a parameter that M1 fixes receives a degenerate interval at zero. Averaging over specifications propagates selection uncertainty into the intervals.
+
+\paragraph{Flexible mean and computation} Adding squared covariates as fixed-only candidates (M5) changes little under DGP-A, where there is no curvature, except that it further reduces the inclusion of null covariates ($0.03$ against $0.08$ at $n=300$, $T=1$). Its value under omitted curvature is the subject of DGP-B. The proposed sampler takes between 8 and 46 seconds per data set on one core, against 1 to 26 seconds for M1.
+
+\paragraph{Other procedures} \tbd{Insert M2 (sequential Bayesian with DIC) and M3 (BIC search) results when the run completes. Pilot evidence: on panel data, one-at-a-time DIC comparisons declare nearly every retained covariate random, because a random coefficient on any uncentered covariate absorbs site-level heterogeneity that the all-fixed comparison model lacks, and the BIC search is competitive in the largest panel.}
 
 \begin{table}[!htbp]
 \centering
@@ -49,17 +61,39 @@ The proposed methods use the default hyperparameters of Section~\ref{sec:prior},
 \caption{Specification recovery under DGP-A ($p=20$, $\rho=0.5$, $r=1$). Entries are averages over 100 replications.}
 \label{tab:sim-recovery}
 \small
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{llcccc}
 \toprule
  & & \multicolumn{2}{c}{$n=300$} & \multicolumn{2}{c}{$n=1000$} \\
 \cmidrule(lr){3-4}\cmidrule(lr){5-6}
 Method & Measure & $T=1$ & $T=5$ & $T=1$ & $T=5$ \\
 \midrule
-\input{tables/dgpA_recovery_rows}
+\tablerows{tables/dgpA_recovery_rows.tex}
 \bottomrule
 \end{tabular}
 \begin{tablenotes}\footnotesize
-\item Exact recovery: all 20 states correct. Three-state accuracy: share of candidates whose state is correct. TPR (R): share of the three true random parameters selected as random. Fixed declared R: share of the four true fixed effects selected as random. FDP (R): false discovery proportion among parameters selected as random (zero when none is selected). Null included: share of the 13 null candidates selected as fixed or random. MCSE-NOTE
+\item Exact recovery: all 20 states correct. Three-state accuracy: share of candidates whose state is correct. TPR (R): share of the three true random parameters selected as random. Fixed declared R: share of the four true fixed effects selected as random. FDP (R): false discovery proportion among parameters selected as random (zero when none is selected). Null included: share of the 13 null candidates selected as fixed or random. Monte Carlo standard errors are at most $0.05$.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\begin{threeparttable}
+\caption{Effect of the decision rule for M4 under DGP-A: median probability rule against Bayesian false discovery rate (FDR) control for the claim that a parameter is random, at targets $q=0.10$ and $q=0.05$. Averages over 100 replications.}
+\label{tab:sim-rules}
+\small
+\begin{tabular}{llcccc}
+\toprule
+ & & \multicolumn{2}{c}{$n=300$} & \multicolumn{2}{c}{$n=1000$} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+Measure & Rule & $T=1$ & $T=5$ & $T=1$ & $T=5$ \\
+\midrule
+\tablerows{tables/dgpA_rules_rows.tex}
+\bottomrule
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item Measures as in Table~\ref{tab:sim-recovery}. Results for M5 are similar and are given in the replication files.
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
@@ -79,10 +113,10 @@ Method & Measure & $T=1$ & $T=5$ & $T=1$ & $T=5$ \\
 Method & RMSE & Cover. & RMSE & Cover. & RMSE & Cover. & RMSE & Cover. \\
 \midrule
 \multicolumn{9}{l}{\emph{$n=300$}}\\
-\input{tables/dgpA_estimation_rows_n300}
+\tablerows{tables/dgpA_estimation_rows_n300.tex}
 \midrule
 \multicolumn{9}{l}{\emph{$n=1000$}}\\
-\input{tables/dgpA_estimation_rows_n1000}
+\tablerows{tables/dgpA_estimation_rows_n1000.tex}
 \bottomrule
 \end{tabular}
 \begin{tablenotes}\footnotesize
