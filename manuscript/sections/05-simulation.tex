@@ -1,0 +1,105 @@
+\section{Simulation study}\label{sec:simulation}
+
+The simulation study has three aims: to compare specification recovery with the procedures used in practice, to quantify the confounding described in Section~\ref{sec:identification}, and to check estimation accuracy and the calibration of the posterior state probabilities.
+
+\subsection{Data-generating processes}
+
+\paragraph{Covariates} Each data set has $p=20$ candidate covariates, ten continuous and ten binary, with a larger setting of $p=50$ for scalability. Continuous covariates are $x_{itj}=1+u_{itj}$ with $(u_{it1},\dots,u_{it,10})$ multivariate normal with unit variances and correlations $\rho^{|j-k|}$, so they have nonzero means as roadway covariates do. Binary covariates are obtained by thresholding correlated latent normals at their 70th percentile. In panel designs five of the continuous covariates vary over time (as traffic and weather variables do) and the remaining covariates are constant within a site (as geometric variables are). The offset is $o_{it}=\log\ell_i$ with segment lengths $\ell_i\sim\mathrm{Uniform}(0.5,2)$. The intercept is set so that the average count is about two, which is typical of segment-level data, with a high-count variant at about eight.
+
+\paragraph{True structures} Four data-generating processes (DGPs) are used.
+\begin{itemize}[leftmargin=*]
+\item \emph{DGP-A (heterogeneous effects).} Three random parameters, $(\beta_1,\sigma_1)=(0.3,0.5)$ and $(\beta_2,\sigma_2)=(-0.3,0.5)$ on continuous covariates and $(\beta_{11},\sigma_{11})=(0.4,0.5)$ on a binary covariate. Four fixed effects, $\beta_3=0.3$, $\beta_4=-0.2$, $\beta_{12}=0.3$, $\beta_{13}=-0.3$. The other thirteen candidates are excluded.
+\item \emph{DGP-B (omitted curvature).} No random parameters. Covariate $x_1$ has a convex effect, $0.3x_1+0.15x_1^2$, and the fixed effects are as in DGP-A. By Corollary~\ref{cor:confounding}(ii) this is the setting in which a linear specification is expected to produce a spurious random parameter on $x_1$.
+\item \emph{DGP-C (varying dispersion).} No random parameters. The dispersion depends on a binary covariate, $\log r_{it}=\log r-0.7\,x_{it,11}$. By Corollary~\ref{cor:confounding}(iii) this is the setting in which a spurious random parameter on $x_{11}$ is expected in cross-sectional data but not in panel data.
+\item \emph{DGP-D (zero-mean heterogeneity).} As DGP-A, plus a random parameter with zero mean on $x_5$, $(\beta_5,\sigma_5)=(0,0.5)$, to compare strong and weak heredity.
+\end{itemize}
+The factors varied are the number of sites $n\in\{300,1000\}$, the number of periods $T\in\{1,5\}$, the dispersion $r\in\{1,5\}$ and the correlation $\rho\in\{0,0.5\}$. Each cell has 200 replications. \tbd{Confirm the grid against the computational budget once run times are known.}
+
+\subsection{Methods compared}
+
+\begin{enumerate}[label=(M\arabic*),leftmargin=*]
+\item \emph{Sequential simulated maximum likelihood.} A fixed parameters NB model is reduced by backward elimination at the 5\% level. Each retained coefficient is then specified as random (500 Halton draws) and kept random if the $t$-statistic of its standard deviation exceeds 1.96, otherwise fixed. This mimics the procedure described in Section~\ref{sec:background}.
+\item \emph{Sequential Bayesian.} The same sequence with full Bayesian estimation, vague inverse-gamma priors on variances, and random versus fixed decided by the deviance information criterion.
+\item \emph{Information criterion search.} A greedy forward and backward search over the three states of every candidate that minimizes the Bayesian information criterion, a simple stand-in for the metaheuristic search of \citet{ahern2024extensive}.
+\item \emph{Proposed, linear mean.} The three-state prior with strong heredity.
+\item \emph{Proposed, flexible mean.} As (M4), with the squares of the continuous covariates added as fixed-only candidates (Remark~\ref{rem:practice}).
+\item \emph{Proposed, weak heredity.} As (M5) with $\pi_{\sigma0}\sim\Betad(1,9)$, used in DGP-D.
+\end{enumerate}
+An oracle that fits the RPNB model at the true specification serves as a benchmark for estimation accuracy. The proposed methods use the default hyperparameters of Section~\ref{sec:prior}, \tbd{number} chains of \tbd{number} iterations after \tbd{number} burn-in, and the median-probability state for each covariate.
+
+\subsection{Performance measures}
+
+\begin{itemize}[leftmargin=*]
+\item \emph{Specification recovery.} The proportion of replications that recover the entire true state vector, and the three-class accuracy averaged over covariates.
+\item \emph{Random parameter claims.} The true positive rate, false positive rate and false discovery proportion for the claim $\state_j=\mathrm{R}$, and the Matthews correlation coefficient.
+\item \emph{Calibration.} For the proposed methods, the agreement between $P_j(\mathrm{R})$ and the empirical frequency of $\state_j=\mathrm{R}$ in bins of the posterior probability.
+\item \emph{Estimation.} Root mean squared error and the coverage of 95\% intervals for $\beta_j$ and $|\sigma_j|$, and for $r$.
+\item \emph{Prediction.} Log predictive density on held-out sites, and on a held-out final period in panel designs \citep{vehtari2017practical}.
+\item \emph{Computation.} Run time and effective sample size per second for $|\sigma_j|$ and for the number of selected random parameters.
+\end{itemize}
+
+\subsection{Results}
+
+\tbd{Insert results after running the simulation. Do not interpret before the numbers are in. Expected patterns to check, derived from Section~\ref{sec:identification}: (i) sequential procedures declare spurious random parameters more often as $p$ grows, (ii) under DGP-B, M1 to M4 select a random parameter on $x_1$ in cross-sectional data and M5 does not, (iii) under DGP-C, all methods confuse varying dispersion with a random parameter more often when $T=1$ than when $T=5$.}
+
+\begin{table}[ht]
+\centering
+\begin{threeparttable}
+\caption{Specification recovery under DGP-A ($p=20$, $\rho=0.5$, $r=1$). Entries are averages over 200 replications.}
+\label{tab:sim-recovery}
+\begin{tabular}{llcccc}
+\toprule
+ & & \multicolumn{2}{c}{$n=300$} & \multicolumn{2}{c}{$n=1000$} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+Method & Measure & $T=1$ & $T=5$ & $T=1$ & $T=5$ \\
+\midrule
+\multirow{3}{*}{M1 Sequential SML} & Exact recovery & -- & -- & -- & -- \\
+ & TPR / FPR (R) & -- & -- & -- & -- \\
+ & FDP (R) & -- & -- & -- & -- \\
+\midrule
+\multirow{3}{*}{M2 Sequential Bayes} & Exact recovery & -- & -- & -- & -- \\
+ & TPR / FPR (R) & -- & -- & -- & -- \\
+ & FDP (R) & -- & -- & -- & -- \\
+\midrule
+\multirow{3}{*}{M3 BIC search} & Exact recovery & -- & -- & -- & -- \\
+ & TPR / FPR (R) & -- & -- & -- & -- \\
+ & FDP (R) & -- & -- & -- & -- \\
+\midrule
+\multirow{3}{*}{M4 Proposed, linear} & Exact recovery & -- & -- & -- & -- \\
+ & TPR / FPR (R) & -- & -- & -- & -- \\
+ & FDP (R) & -- & -- & -- & -- \\
+\midrule
+\multirow{3}{*}{M5 Proposed, flexible} & Exact recovery & -- & -- & -- & -- \\
+ & TPR / FPR (R) & -- & -- & -- & -- \\
+ & FDP (R) & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item TPR, FPR and FDP refer to the claim that a parameter is random. Placeholders until the simulation is run.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\begin{threeparttable}
+\caption{Rate of spurious random parameters under omitted curvature (DGP-B, covariate $x_1$) and varying dispersion (DGP-C, covariate $x_{11}$), $n=1000$.}
+\label{tab:sim-spurious}
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{DGP-B} & \multicolumn{2}{c}{DGP-C} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Method & $T=1$ & $T=5$ & $T=1$ & $T=5$ \\
+\midrule
+M1 Sequential SML & -- & -- & -- & -- \\
+M2 Sequential Bayes & -- & -- & -- & -- \\
+M3 BIC search & -- & -- & -- & -- \\
+M4 Proposed, linear & -- & -- & -- & -- \\
+M5 Proposed, flexible & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item Placeholders until the simulation is run.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}

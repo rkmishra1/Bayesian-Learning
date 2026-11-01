@@ -1,0 +1,15 @@
+\section{Application}\label{sec:application}
+
+\tbd{Choose the data set. Preferred: a multi-year panel of roadway segments with geometry and traffic volumes, for example from the Highway Safety Information System (HSIS), ideally for a state and facility type with a published random parameters specification so that the two can be compared directly. A panel is preferred because of Proposition~\ref{prop:panel}. An Indian application would need segment-level data from a state road agency or NHAI.}
+
+\subsection{Data}
+\tbd{Study area, facility type, years, number of segments and segment-years, crash definition (total or by severity), descriptive statistics table, and the candidate covariates with units.}
+
+\subsection{Model setup}
+\tbd{Offset definition, treatment of traffic volume (offset with unit elasticity or candidate covariate), scaling of covariates (Remark~\ref{rem:centering}), quadratic fixed-only candidates, heredity choice, hyperparameters, chains and diagnostics.}
+
+\subsection{Results}
+\tbd{Table of posterior state probabilities $P_j(\mathrm{E})$, $P_j(\mathrm{F})$, $P_j(\mathrm{R})$ for every candidate. Comparison with the specification obtained by the sequential procedure (M1) on the same data. Model-averaged estimates of $\beta_j$, $|\sigma_j|$ and the share of segments with a positive effect. Out-of-sample predictive comparison on a held-out final year.}
+
+\subsection{Sensitivity}
+\tbd{Results under $(a_\sigma,b_\sigma)\in\{(1,1),(1,4)\}$, $A_\sigma\in\{0.25,0.5,1\}$, strong versus weak heredity, and with and without quadratic candidates.}

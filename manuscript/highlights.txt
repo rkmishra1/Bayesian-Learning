@@ -1,0 +1,7 @@
+Highlights (Elsevier: 3 to 5 bullets, at most 85 characters each, submitted as a separate file)
+
+- Choosing which crash-model parameters are random is cast as variable selection
+- A three-state spike-and-slab prior labels each effect excluded, fixed or random
+- In cross-section, random parameters mimic curvature and varying dispersion
+- Panel data identify random parameters through within-site covariance
+- A partially collapsed Pólya-Gamma Gibbs sampler makes the search practical

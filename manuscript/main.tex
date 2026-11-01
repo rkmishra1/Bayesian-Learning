@@ -1,0 +1,102 @@
+%% Draft manuscript for Transportation Research Part B: Methodological (Elsevier).
+%% Class: elsarticle, author-year (Harvard) references as required by the TR series.
+%% Build: latexmk -pdf main.tex
+\documentclass[preprint,12pt,authoryear]{elsarticle}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm,mathtools,bm}
+\usepackage{booktabs,multirow,threeparttable}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,citecolor=blue!60!black,linkcolor=blue!60!black,urlcolor=blue!60!black]{hyperref}
+\usepackage{lineno}
+\usepackage{setspace}
+\usepackage[textsize=footnotesize,color=orange!25]{todonotes}
+
+\linenumbers
+
+%% Theorem-like environments
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+%% Notation
+\newcommand{\NB}{\mathrm{NB}}
+\newcommand{\PG}{\mathrm{PG}}
+\newcommand{\CRT}{\mathrm{CRT}}
+\newcommand{\Normal}{\mathrm{N}}
+\newcommand{\Bern}{\mathrm{Bernoulli}}
+\newcommand{\Betad}{\mathrm{Beta}}
+\newcommand{\Gammad}{\mathrm{Gamma}}
+\newcommand{\IG}{\mathrm{IG}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\x}{\bm{x}}
+\newcommand{\y}{\bm{y}}
+\newcommand{\bbeta}{\bm{\beta}}
+\newcommand{\bsigma}{\bm{\sigma}}
+\newcommand{\bgamma}{\bm{\gamma}}
+\newcommand{\bdelta}{\bm{\delta}}
+\newcommand{\bomega}{\bm{\omega}}
+\newcommand{\state}{S}
+\newcommand{\tbd}[1]{\todo[inline,color=red!15]{#1}}
+
+\journal{Transportation Research Part B: Methodological}
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{Which parameters should be random? Bayesian selection of fixed and random parameters in crash frequency models}
+
+\author[inst1]{Ramakrushna Mishra\corref{cor1}}
+\cortext[cor1]{Corresponding author.}
+\ead{TBD@example.org}
+\affiliation[inst1]{organization={TBD (affiliation)},
+            city={TBD},
+            country={India}}
+%% \author[inst2]{Co-author}
+%% \affiliation[inst2]{organization={},city={},country={}}
+
+\begin{abstract}
+Random parameters count models are a standard tool for representing unobserved heterogeneity in crash frequency analysis, yet which parameters are random is usually decided by testing one standard deviation at a time or by searching specifications with an information criterion. Inference is then reported conditional on one selected specification, and spurious heterogeneity is not controlled. This paper recasts the choice among excluded, fixed and random effects as Bayesian variable selection. A three-state spike-and-slab prior in a non-centered parameterization places point masses at zero on the mean and on the signed standard deviation of each candidate parameter, linked by a heredity structure. We show that in cross-sectional data a random parameter enters the count distribution only through a covariate-dependent lognormal variance, which adds a quadratic term to the conditional mean and makes overdispersion covariate dependent. Random parameters are therefore hard to separate from omitted curvature and varying dispersion unless panel data supply within-site covariance. A P\'olya-Gamma Gibbs sampler integrates out the site-specific draws when deciding whether a parameter is random.
+{\color{red}[Simulation and application findings to be added.]}
+The method reports, for every candidate, posterior probabilities of being excluded, fixed or random.
+\end{abstract}
+
+\begin{keyword}
+Crash frequency \sep Random parameters \sep Unobserved heterogeneity \sep Bayesian variable selection \sep Spike-and-slab prior \sep P\'olya-Gamma augmentation
+\end{keyword}
+
+\end{frontmatter}
+
+\onehalfspacing
+
+\input{sections/01-introduction}
+\input{sections/02-background}
+\input{sections/03-model}
+\input{sections/04-computation}
+\input{sections/05-simulation}
+\input{sections/06-application}
+\input{sections/07-discussion}
+\input{sections/08-conclusion}
+
+\section*{CRediT authorship contribution statement}
+\tbd{Complete per Elsevier CRediT taxonomy.}
+
+\section*{Declaration of competing interest}
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+
+\section*{Data availability}
+\tbd{State data source and access conditions for the application, and the repository for code.}
+
+\appendix
+\input{sections/appendix}
+
+\bibliographystyle{elsarticle-harv}
+\bibliography{references}
+
+\end{document}

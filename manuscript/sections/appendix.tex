@@ -1,0 +1,43 @@
+\section{Proofs}\label{app:proofs}
+
+\paragraph{Proof of Proposition~\ref{prop:cross}}
+(a) Given $\x_i$, $\varepsilon_i=\sum_j\sigma_jx_{ij}z_{ij}$ is a linear combination of independent standard normal variables, hence normal with mean zero and variance $\sum_j\sigma_j^2x_{ij}^2=v(\x_i)$. Conditional on $\varepsilon_i$, $y_i$ is negative binomial with mean $e^{\eta_i+\varepsilon_i}$ and dispersion $r$. Integrating over $\varepsilon_i$ gives the stated likelihood, which involves $(\sigma_1,\dots,\sigma_p)$ only through $v(\x_i)$.
+
+(b) Let $\lambda_i=e^{\eta_i+\varepsilon_i}$. Since $\E(e^{\varepsilon_i})=e^{v(\x_i)/2}$ and $\E(e^{2\varepsilon_i})=e^{2v(\x_i)}$, we have $\mu_i=\E(\lambda_i)=e^{\eta_i+v(\x_i)/2}$ and $\E(\lambda_i^2)=e^{2\eta_i+2v(\x_i)}=\mu_i^2e^{v(\x_i)}$. By the law of total variance,
+\[
+\Var(y_i\mid\x_i)=\E(\lambda_i+\lambda_i^2/r)+\Var(\lambda_i)
+=\mu_i+\left(1+\tfrac1r\right)\mu_i^2e^{v(\x_i)}-\mu_i^2 ,
+\]
+which is \eqref{eq:moments}.
+
+(c) Suppose $\sum_jc_jx_j^2=0$ for all $\x$ in the support, for some $c\neq0$. If all $\sigma_j^2>0$, then $\sigma_j^2+tc_j>0$ for all $j$ and all $|t|$ small enough, and the corresponding variance function equals $v(\x)+t\sum_jc_jx_j^2=v(\x)$ on the support. By (a) the likelihood is the same for every such $t$, so the variances are not locally identified. \hfill$\square$
+
+\paragraph{Proof of Corollary~\ref{cor:confounding}}
+(i) If $x_j\in\{0,1\}$ then $x_j^2=x_j$, so by \eqref{eq:moments} the log mean is $o_i+\alpha+\sum_{k\neq j}\{\beta_kx_k+\sigma_k^2x_k^2/2\}+x_j(\beta_j+\sigma_j^2/2)$, which depends on $(\beta_j,\sigma_j)$ only through $\beta_j+\sigma_j^2/2$. The variance in \eqref{eq:moments} depends on $v(\x_i)$, which differs by $\sigma_j^2$ between $x_j=1$ and $x_j=0$ with the other covariates held fixed.
+(ii) The log mean contains $\beta_jx_j+\sigma_j^2x_j^2/2$, and $\sigma_j^2/2\ge0$.
+(iii) An NB model with mean $m$ and dispersion $r(\x)$ has variance $m+m^2/r(\x)$. Taking $m=\mu_i$ and $1/r(\x_i)=(1+1/r)e^{v(\x_i)}-1$, which is positive because $(1+1/r)e^{v(\x_i)}>1$, reproduces both moments in \eqref{eq:moments}. \hfill$\square$
+
+\paragraph{Proof of Proposition~\ref{prop:panel}}
+Conditional on the random components, $y_{it}$ and $y_{is}$ are independent with means $\lambda_{it}=e^{\eta_{it}+\varepsilon_{it}}$ and $\lambda_{is}=e^{\eta_{is}+\varepsilon_{is}}$, because the gamma mixing of the negative binomial acts independently in each period. Hence $\Cov(y_{it},y_{is}\mid\cdot)=\Cov(\lambda_{it},\lambda_{is})=\E(\lambda_{it}\lambda_{is})-\mu_{it}\mu_{is}$. The sum $\varepsilon_{it}+\varepsilon_{is}$ is normal with mean zero and variance $v(\x_{it})+v(\x_{is})+2\x_{it}^\top D\x_{is}$, so $\E(\lambda_{it}\lambda_{is})=\exp\{\eta_{it}+\eta_{is}+v(\x_{it})/2+v(\x_{is})/2+\x_{it}^\top D\x_{is}\}=\mu_{it}\mu_{is}\exp(\x_{it}^\top D\x_{is})$. The dispersion $r$ does not appear. \hfill$\square$
+
+\section{Derivation of the conditional updates}\label{app:derivations}
+
+\paragraph{Proposition~\ref{prop:marginal}}
+Given the P\'olya-Gamma variables, the working log likelihood is $-\frac12\sum_{i,t}\omega_{it}(\tilde y_{it}-\psi_{it})^2$ up to a constant. Isolating the contribution of $\sigma_jx_{itj}z_{ij}$, the terms that involve $z_{ij}$ for site $i$ are
+\[
+-\tfrac12\sum_{t}\omega_{it}\left(e_{it}-\sigma x_{itj}z_{ij}\right)^2
+=-\tfrac12\sum_t\omega_{it}e_{it}^2+\sigma z_{ij}b_{ij}-\tfrac12\sigma^2z_{ij}^2q_{ij}.
+\]
+Multiplying by the standard normal density of $z_{ij}$ and integrating,
+\begin{align*}
+&\int\frac{1}{\sqrt{2\pi}}\exp\left\{-\tfrac12\left(1+\sigma^2q_{ij}\right)z^2+\sigma b_{ij}z\right\}dz\\
+&\qquad=\left(1+\sigma^2q_{ij}\right)^{-1/2}\exp\left\{\frac{\sigma^2b_{ij}^2}{2\left(1+\sigma^2q_{ij}\right)}\right\},
+\end{align*}
+which equals one at $\sigma=0$. Taking the product over sites and logarithms gives \eqref{eq:ell}. Completing the square in the same integrand gives the normal conditional distribution of $z_{ij}$ stated in the proposition.
+
+\paragraph{Fixed effects}
+The terms of the working log likelihood that involve $\beta_j$ are $B_j\beta_j-\frac12S_j\beta_j^2$ up to a constant. Integrating against the $\Normal(0,\tau_\beta^2)$ slab gives
+$\tau_\beta^{-1}(S_j+\tau_\beta^{-2})^{-1/2}\exp\{B_j^2/(2(S_j+\tau_\beta^{-2}))\}$, which equals \eqref{eq:bf-beta}, and the conditional distribution of $\beta_j$ given $\gamma_j=1$ is normal with precision $S_j+\tau_\beta^{-2}$ and mean $B_j/(S_j+\tau_\beta^{-2})$.
+
+\paragraph{Dispersion}
+With $p_{it}=e^{\psi_{it}}/(1+e^{\psi_{it}})$, the negative binomial probability is proportional to $\{\Gamma(y_{it}+r)/\Gamma(r)\}(1-p_{it})^r$ as a function of $r$. Since $\Gamma(y+r)/\Gamma(r)=\sum_{l=0}^{y}|s(y,l)|\,r^l$, with $|s(y,l)|$ unsigned Stirling numbers of the first kind, introducing $L_{it}$ with $\Pr(L_{it}=l\mid y_{it},r)\propto|s(y_{it},l)|r^l$, which is the $\CRT(y_{it},r)$ distribution, gives a joint density proportional to $r^{\sum L_{it}}\exp\{-r\sum\log(1+e^{\psi_{it}})\}$. With a $\Gammad(a_r,b_r)$ prior the full conditional of $r$ is $\Gammad\left(a_r+\sum L_{it},\ b_r+\sum\log(1+e^{\psi_{it}})\right)$ \citep{zhou2015negative}.

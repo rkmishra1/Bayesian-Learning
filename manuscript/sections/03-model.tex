@@ -1,0 +1,112 @@
+\section{Model}\label{sec:model}
+
+\subsection{Random parameters negative binomial model}\label{sec:rpnb}
+
+Let $y_{it}$ be the number of crashes at site $i=1,\dots,n$ in period $t=1,\dots,T_i$, with $N=\sum_i T_i$ observations in total. Cross-sectional data correspond to $T_i=1$. Let $\x_{it}=(x_{it1},\dots,x_{itp})^\top$ collect $p$ candidate covariates and let $o_{it}$ be a known offset, for example the logarithm of segment length times the length of the period. Conditional on a rate $\lambda_{it}$, the count follows a negative binomial distribution with mean $\lambda_{it}$ and dispersion $r>0$,
+\begin{equation}\label{eq:nb}
+\Pr(y_{it}=y \mid \lambda_{it}, r)=\frac{\Gamma(y+r)}{\Gamma(r)\,y!}\left(\frac{r}{r+\lambda_{it}}\right)^{r}\left(\frac{\lambda_{it}}{r+\lambda_{it}}\right)^{y},
+\end{equation}
+so that $\Var(y_{it}\mid\lambda_{it})=\lambda_{it}+\lambda_{it}^2/r$.
+The random parameters specification is
+\begin{equation}\label{eq:rp}
+\log\lambda_{it}=o_{it}+\alpha+\sum_{j=1}^{p}x_{itj}\,\beta_{ij},
+\qquad \beta_{ij}=\beta_j+\sigma_j z_{ij},
+\qquad z_{ij}\overset{\text{iid}}{\sim}\Normal(0,1),
+\end{equation}
+so that the coefficient of covariate $j$ at site $i$ is normally distributed with mean $\beta_j$ and standard deviation $|\sigma_j|$. The draw $z_{ij}$ is shared by all periods of site $i$, so in panel data a site keeps its coefficient over time, while in cross-sectional data each observation has its own coefficient. Substituting the second equation into the first gives the non-centered form
+\begin{equation}\label{eq:noncentered}
+\log\lambda_{it}=o_{it}+\alpha+\x_{it}^\top\bbeta+\varepsilon_{it},
+\qquad \varepsilon_{it}=\sum_{j=1}^{p}\sigma_j\,x_{itj}\,z_{ij}.
+\end{equation}
+We allow $\sigma_j$ to take any real value. Its sign is not identified, because $(\sigma_j,z_{ij})$ and $(-\sigma_j,-z_{ij})$ give the same likelihood, and all reported quantities depend on $\sigma_j$ only through $|\sigma_j|$. The advantage of \eqref{eq:noncentered} is that, given $z_{ij}$, the parameter $\sigma_j$ enters the linear predictor linearly, exactly as $\beta_j$ does \citep{papaspiliopoulos2007general, fruhwirth2010stochastic}.
+
+Each covariate is in one of three states,
+\begin{equation}\label{eq:states}
+\state_j=\begin{cases}
+\mathrm{E}\ (\text{excluded}) & \text{if } \beta_j=0 \text{ and } \sigma_j=0,\\
+\mathrm{F}\ (\text{fixed}) & \text{if } \beta_j\neq 0 \text{ and } \sigma_j=0,\\
+\mathrm{R}\ (\text{random}) & \text{if } \sigma_j\neq 0 .
+\end{cases}
+\end{equation}
+The specification problem is to learn $\state=(\state_1,\dots,\state_p)$. Some columns of $\x_{it}$ may be admissible only as fixed effects, for example quadratic terms introduced to protect against the confounding described in Section~\ref{sec:identification}. For those columns we set $\sigma_j=0$.
+
+\begin{remark}[Centering changes the model]\label{rem:centering}
+For a fixed parameter, replacing $x_{itj}$ by $x_{itj}-c$ only shifts the intercept. For a random parameter it does more: $\beta_{ij}(x_{itj}-c)=\beta_{ij}x_{itj}-c\beta_j-c\sigma_j z_{ij}$, and the last term is a site-specific random intercept. Centering therefore moves heterogeneity between the slope and the intercept and changes the variance function $v(\cdot)$ defined below. We scale continuous covariates by their standard deviations but do not center them, and we leave binary covariates coded $0/1$, which keeps the conventional interpretation of random parameters.
+\end{remark}
+
+\subsection{What crash data can reveal about random parameters}\label{sec:identification}
+
+Write $\eta_{it}=o_{it}+\alpha+\x_{it}^\top\bbeta$, $D=\operatorname{diag}(\sigma_1^2,\dots,\sigma_p^2)$ and $v(\x)=\x^\top D\x=\sum_j\sigma_j^2x_j^2$. Given the covariates, $\varepsilon_{it}$ in \eqref{eq:noncentered} is a sum of independent normal terms, so $\varepsilon_{it}\sim\Normal\{0,v(\x_{it})\}$ and $\Cov(\varepsilon_{it},\varepsilon_{is})=\x_{it}^\top D\,\x_{is}$. The following results, proved in \ref{app:proofs}, describe what this implies for the distribution of crash counts.
+
+\begin{proposition}[Cross-sectional data]\label{prop:cross}
+Let $T_i=1$ and drop the index $t$. Then:
+\begin{enumerate}[label=(\alph*)]
+\item The likelihood contribution of site $i$ is
+\[
+\int \NB\{y_i \mid e^{\eta_i+u}, r\}\,\phi\{u \mid 0, v(\x_i)\}\,du,
+\]
+where $\phi(\cdot\mid 0,v)$ is the normal density with variance $v$. The likelihood therefore depends on $(\sigma_1,\dots,\sigma_p)$ only through the variance function $v(\cdot)$.
+\item The conditional mean and variance are
+\begin{equation}\label{eq:moments}
+\begin{aligned}
+\mu_i&=\E(y_i\mid\x_i)=\exp\{\eta_i+v(\x_i)/2\},\\
+\Var(y_i\mid\x_i)&=\mu_i+\mu_i^2\left\{\left(1+\tfrac{1}{r}\right)e^{v(\x_i)}-1\right\}.
+\end{aligned}
+\end{equation}
+\item A necessary condition for $(\sigma_1^2,\dots,\sigma_p^2)$ to be locally identified at a point with all $\sigma_j^2>0$ is that the functions $\x\mapsto x_j^2$, $j=1,\dots,p$, be linearly independent on the support of $\x$.
+\end{enumerate}
+\end{proposition}
+
+Part (b) has three consequences that bear directly on specification practice.
+
+\begin{corollary}\label{cor:confounding}
+Under the conditions of Proposition~\ref{prop:cross}:
+\begin{enumerate}[label=(\roman*)]
+\item If $x_j$ is binary, then $x_j^2=x_j$ and the log mean contains $x_j(\beta_j+\sigma_j^2/2)$. The mean identifies only $\beta_j+\sigma_j^2/2$, and information about $\sigma_j$ comes solely from the difference in overdispersion between sites with $x_j=1$ and $x_j=0$.
+\item If $x_j$ is continuous, a random parameter adds $\sigma_j^2x_j^2/2$ to the log mean, which is indistinguishable in the mean from a fixed quadratic effect with a positive coefficient. A convex effect omitted from a linear specification can therefore surface as a spurious random parameter. A concave effect cannot.
+\item The first two conditional moments in \eqref{eq:moments} coincide with those of a fixed parameters NB model with log mean $\eta_i+v(\x_i)/2$ and covariate-dependent dispersion $r(\x_i)=\left[(1+1/r)e^{v(\x_i)}-1\right]^{-1}$. Separating a random parameter from varying dispersion \citep{miaou2003modeling} therefore relies on higher moments, that is, on the difference between lognormal and gamma mixing.
+\end{enumerate}
+\end{corollary}
+
+Panel data change the picture because the same draw $z_{ij}$ affects all periods of a site.
+
+\begin{proposition}[Panel data]\label{prop:panel}
+For $t\neq s$,
+\begin{equation}\label{eq:panelcov}
+\Cov(y_{it},y_{is}\mid \x_{i1},\dots,\x_{iT_i})=\mu_{it}\,\mu_{is}\left\{\exp\left(\x_{it}^\top D\,\x_{is}\right)-1\right\},
+\end{equation}
+where $\mu_{it}=\exp\{\eta_{it}+v(\x_{it})/2\}$. The covariance does not depend on the dispersion $r$.
+\end{proposition}
+
+The negative binomial dispersion, fixed or covariate dependent, acts independently in each period and implies zero within-site covariance. The covariance in \eqref{eq:panelcov} is therefore information about $D$ that the dispersion cannot mimic. A site-level random intercept, which corresponds to a column $x_{it0}\equiv 1$, also induces within-site covariance, but a constant one. Random slopes are identified from how the covariance changes with the covariates, which is why the random intercept should be included among the candidates in panel applications.
+
+\begin{remark}[Practical implications]\label{rem:practice}
+With cross-sectional data, evidence for a random parameter is evidence of a covariate-dependent variance in the log rate, which genuine heterogeneity in the effect can produce but which omitted convex curvature and varying dispersion can also produce. We therefore (i) include quadratic terms of continuous covariates as fixed-only candidates, so that curvature is not absorbed into $\sigma_j$, and (ii) interpret selected random parameters in cross-sectional data with this caveat. When the aim is to establish heterogeneity, panel data are far more informative. Section~\ref{sec:simulation} quantifies both effects.
+\end{remark}
+
+\subsection{Prior specification}\label{sec:prior}
+
+We introduce indicators $\gamma_j=\mathbb{1}(\beta_j\neq0)$ and $\delta_j=\mathbb{1}(\sigma_j\neq0)$ and use point-mass spike-and-slab priors for both:
+\begin{align}
+\beta_j\mid\gamma_j,\tau_\beta &\sim \gamma_j\,\Normal(0,\tau_\beta^2)+(1-\gamma_j)\,\mathbb{1}_{\{0\}}, \label{eq:prior-beta}\\
+\gamma_j\mid\pi_\beta &\sim \Bern(\pi_\beta), \nonumber\\
+\sigma_j\mid\delta_j,\tau_\sigma &\sim \delta_j\,\Normal(0,\tau_\sigma^2)+(1-\delta_j)\,\mathbb{1}_{\{0\}}, \label{eq:prior-sigma}\\
+\delta_j\mid\gamma_j,\pi_{\sigma1},\pi_{\sigma0} &\sim \Bern\{\gamma_j\pi_{\sigma1}+(1-\gamma_j)\pi_{\sigma0}\}. \nonumber
+\end{align}
+The prior for $\delta_j$ encodes heredity \citep{chipman1996bayesian}. Under \emph{strong heredity}, $\pi_{\sigma0}=0$ and a parameter can be random only if its mean is nonzero, which matches the way specifications are built in practice. Under \emph{weak heredity}, $\pi_{\sigma0}$ is small but positive, which admits effects whose mean is zero but whose sign varies across sites. The three states in \eqref{eq:states} correspond to $(\gamma_j,\delta_j)=(0,0)$, $(1,0)$ and $\delta_j=1$.
+
+The inclusion probabilities receive beta hyperpriors, $\pi_\beta\sim\Betad(a_\beta,b_\beta)$, $\pi_{\sigma1}\sim\Betad(a_\sigma,b_\sigma)$ and, under weak heredity, $\pi_{\sigma0}\sim\Betad(a_0,b_0)$. Learning these probabilities from the data produces the multiplicity adjustment of \citet{scott2010bayes}: as more candidates are considered, the prior probability that any particular one is random falls in line with the evidence that most are not. The slab scales receive half-Cauchy priors, $\tau_\beta\sim\mathrm{C}^+(0,A_\beta)$ and $\tau_\sigma\sim\mathrm{C}^+(0,A_\sigma)$, written as scale mixtures of inverse-gamma distributions to keep the updates conjugate \citep{makalic2016simple}. A Gaussian slab on the signed $\sigma_j$ implies $\sigma_j^2\mid\delta_j=1\sim\tau_\sigma^2\chi^2_1$, a prior on the random parameter variance that places substantial mass near zero. Vague inverse-gamma priors on variances, common in applied Bayesian crash modeling, have vanishing density at zero and tend to overstate heterogeneity when the data are weak \citep{gelman2006prior}. Finally, $\alpha\sim\Normal(0,s_\alpha^2)$ and $r\sim\Gammad(a_r,b_r)$.
+
+\paragraph{Default hyperparameters} With covariates scaled to unit standard deviation we use $a_\beta=b_\beta=a_\sigma=b_\sigma=1$, $A_\beta=1$, $A_\sigma=0.5$, $s_\alpha=10$ and $a_r=1$, $b_r=0.1$. With $|\sigma_j|=0.5$, the rate ratio for a one-standard-deviation increase in $x_j$ at a site one standard deviation above or below the average effect differs from the average rate ratio by a factor of $e^{\pm0.5}$, about $0.61$ to $1.65$, which is already substantial heterogeneity. The scale $A_\sigma=0.5$ therefore makes such values typical without ruling out larger ones. \tbd{Sensitivity analysis to $(a_\sigma,b_\sigma)$, $A_\sigma$ and heredity in Sections~\ref{sec:simulation} and~\ref{sec:application}.}
+
+\subsection{Posterior summaries for practice}\label{sec:summaries}
+
+For each candidate the sampler returns the posterior state probabilities
+\begin{equation}\label{eq:stateprob}
+\begin{aligned}
+P_j(\mathrm{E})&=\Pr(\gamma_j=0,\delta_j=0\mid\y),\\
+P_j(\mathrm{F})&=\Pr(\gamma_j=1,\delta_j=0\mid\y),\\
+P_j(\mathrm{R})&=\Pr(\delta_j=1\mid\y).
+\end{aligned}
+\end{equation}
+Under a zero-one loss for each covariate the Bayes decision is the state with the largest posterior probability. When the claim of interest is that a parameter is random, the set $\widehat{\mathcal R}_c=\{j:P_j(\mathrm{R})\ge c\}$ has estimated Bayesian false discovery rate $\sum_{j\in\widehat{\mathcal R}_c}\{1-P_j(\mathrm{R})\}/|\widehat{\mathcal R}_c|$, and $c$ can be chosen as the smallest threshold that keeps this rate below a target $q$ \citep{newton2004detecting}. Effect summaries are averaged over specifications: the posterior distributions of $\beta_j$ and $|\sigma_j|$, the share of sites with a positive effect $\Phi(\beta_j/|\sigma_j|)$ for parameters in state R, and site-specific coefficients $\beta_{ij}$, which are shrunk toward $\beta_j$ according to the information in each site's data.
