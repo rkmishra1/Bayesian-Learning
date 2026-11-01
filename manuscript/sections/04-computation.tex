@@ -76,7 +76,7 @@ with the second argument a rate. The P\'olya-Gamma variables are integrated out 
   \item set $\delta_j=1$ with probability $\dfrac{\pi_j\,\mathrm{BF}^{\sigma}_j}{\pi_j\,\mathrm{BF}^{\sigma}_j+1-\pi_j}$, where $\pi_j=\gamma_j\pi_{\sigma1}+(1-\gamma_j)\pi_{\sigma0}$
   \item if $\delta_j=1$ draw $|\sigma_j|$ from the density proportional to $\exp\{\ell_j(\sigma)\}\phi(\sigma\mid0,\tau_\sigma^2)$ on $\sigma>0$, attach a random sign, and draw each $z_{ij}$ from Proposition~\ref{prop:marginal}. Otherwise set $\sigma_j=0$.
   \end{enumerate}
-\item Draw $\pi_\beta$, $\pi_{\sigma1}$ (and $\pi_{\sigma0}$ under weak heredity) from their beta full conditionals, and $(\tau_\beta^2,\tau_\sigma^2)$ with their auxiliary variables from inverse-gamma full conditionals.
+\item Draw $\pi_\beta$, $\pi_{\sigma1}$ (and $\pi_{\sigma0}$ under weak heredity) from their beta full conditionals. If the slab scales are learned (a sensitivity option), also draw $(\tau_\beta^2,\tau_\sigma^2)$ and their auxiliary variables from inverse-gamma full conditionals.
 \end{enumerate}
 \end{minipage}}
 \end{figure}
@@ -86,13 +86,13 @@ with the second argument a rate. The P\'olya-Gamma variables are integrated out 
 \pi_\beta&\sim\Betad\left(a_\beta+k_\beta,\ b_\beta+p-k_\beta\right),\\
 \pi_{\sigma1}&\sim\Betad\Big(a_\sigma+\sum_{j\in\mathcal J}\gamma_j\delta_j,\ b_\sigma+\sum_{j\in\mathcal J}\gamma_j(1-\delta_j)\Big),
 \end{align*}
-with the analogous update for $\pi_{\sigma0}$ over $\{j\in\mathcal J:\gamma_j=0\}$. For the half-Cauchy scales \citep{makalic2016simple},
+with the analogous update for $\pi_{\sigma0}$ over $\{j\in\mathcal J:\gamma_j=0\}$. In the sensitivity option with half-Cauchy priors $\tau_\beta\sim\mathrm{C}^+(0,A_\beta)$ and $\tau_\sigma\sim\mathrm{C}^+(0,A_\sigma)$, written as scale mixtures of inverse-gamma distributions \citep{makalic2016simple},
 \begin{align*}
 \tau_\beta^2&\sim\IG\Big(\frac{k_\beta+1}{2},\ \frac{1}{\xi_\beta}+\frac12\sum_{j:\gamma_j=1}\beta_j^2\Big),\\
 \xi_\beta&\sim\IG\left(1,\ A_\beta^{-2}+\tau_\beta^{-2}\right),
 \end{align*}
 and similarly for $\tau_\sigma^2$ with $k_\sigma=\sum_j\delta_j$ and the active $\sigma_j$.
 
-\paragraph{Cost} Steps 1 to 4 cost $O(Np)$ per sweep. Step 5 costs $O(N)$ to form $q_{ij}$ and $b_{ij}$ and $O(Gn)$ for a grid of $G$ points, so a sweep costs $O\{Np+Gn|\mathcal J|\}$. P\'olya-Gamma draws with large $y_{it}+r$ can be replaced by a moment-matched normal approximation if needed. \tbd{Report run times from the implementation.}
+\paragraph{Cost} Steps 1 to 4 cost $O(Np)$ per sweep. Step 5 costs $O(N)$ to form $q_{ij}$ and $b_{ij}$ and $O(Gn)$ for a grid of $G$ points, so a sweep costs $O\{Np+Gn|\mathcal J|\}$. P\'olya-Gamma draws with large $y_{it}+r$ can be replaced by a moment-matched normal approximation if needed. Our implementation is in Python, with the grid evaluation of \eqref{eq:ell} compiled with Numba and P\'olya-Gamma draws from the \texttt{polyagamma} package. We use a coarse grid of 48 points followed by a fine grid of 80 points over the region that holds the mass of the integrand, which reproduces the Bayes factor to five decimals against brute-force integration on 400{,}000 points. Run times are reported in Section~\ref{sec:simulation}.
 
 \paragraph{Convergence} We run several chains from dispersed initial specifications (all excluded, all fixed, all random-eligible covariates random) and monitor the rank-normalized $\widehat R$ of \citet{vehtari2021rank} for $\alpha$, $r$, $\beta_j$, $|\sigma_j|$ and the number of selected fixed and random parameters. Strongly correlated candidates can slow one-at-a-time indicator updates. An optional Metropolis step that swaps the states of two correlated candidates addresses this. \tbd{Decide whether the swap move is needed after the first simulations.}

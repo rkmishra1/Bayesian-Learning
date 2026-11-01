@@ -8,98 +8,115 @@ The simulation study has three aims: to compare specification recovery with the 
 
 \paragraph{True structures} Four data-generating processes (DGPs) are used.
 \begin{itemize}[leftmargin=*]
-\item \emph{DGP-A (heterogeneous effects).} Three random parameters, $(\beta_1,\sigma_1)=(0.3,0.5)$ and $(\beta_2,\sigma_2)=(-0.3,0.5)$ on continuous covariates and $(\beta_{11},\sigma_{11})=(0.4,0.5)$ on a binary covariate. Four fixed effects, $\beta_3=0.3$, $\beta_4=-0.2$, $\beta_{12}=0.3$, $\beta_{13}=-0.3$. The other thirteen candidates are excluded.
+\item \emph{DGP-A (heterogeneous effects).} Three random parameters, $(\beta_1,\sigma_1)=(0.3,0.25)$ and $(\beta_2,\sigma_2)=(-0.3,0.25)$ on continuous covariates and $(\beta_{11},\sigma_{11})=(0.4,0.5)$ on a binary covariate. Because the continuous covariates are not centered, the random component $\sigma_jx_{itj}z_{ij}$ grows with $|x_{itj}|$. With $\sigma_j=0.5$ on the continuous covariates the simulated counts were unrealistic (a maximum above 2{,}000 against a mean of two), so we use $\sigma_j=0.25$, for which the random part has an average standard deviation of about $0.6$ on the log scale and the 99.9th percentile of the counts is below 50. This choice was made on these grounds before any method was compared. Four fixed effects, $\beta_3=0.3$, $\beta_4=-0.2$, $\beta_{12}=0.3$, $\beta_{13}=-0.3$. The other thirteen candidates are excluded.
 \item \emph{DGP-B (omitted curvature).} No random parameters. Covariate $x_1$ has a convex effect, $0.3x_1+0.15x_1^2$, and the fixed effects are as in DGP-A. By Corollary~\ref{cor:confounding}(ii) this is the setting in which a linear specification is expected to produce a spurious random parameter on $x_1$.
 \item \emph{DGP-C (varying dispersion).} No random parameters. The dispersion depends on a binary covariate, $\log r_{it}=\log r-0.7\,x_{it,11}$. By Corollary~\ref{cor:confounding}(iii) this is the setting in which a spurious random parameter on $x_{11}$ is expected in cross-sectional data but not in panel data.
-\item \emph{DGP-D (zero-mean heterogeneity).} As DGP-A, plus a random parameter with zero mean on $x_5$, $(\beta_5,\sigma_5)=(0,0.5)$, to compare strong and weak heredity.
+\item \emph{DGP-D (zero-mean heterogeneity).} As DGP-A, plus a random parameter with zero mean on $x_5$, $(\beta_5,\sigma_5)=(0,0.25)$, to compare strong and weak heredity.
 \end{itemize}
-The factors varied are the number of sites $n\in\{300,1000\}$, the number of periods $T\in\{1,5\}$, the dispersion $r\in\{1,5\}$ and the correlation $\rho\in\{0,0.5\}$. Each cell has 200 replications. \tbd{Confirm the grid against the computational budget once run times are known.}
+The factors varied are the number of sites $n\in\{300,1000\}$ and the number of periods $T\in\{1,5\}$, with dispersion $r=1$ and correlation $\rho=0.5$. Each of the four cells has 100 replications. \tbd{Extend to $r=5$ and $\rho=0$, and to DGP-B to DGP-D.}
 
 \subsection{Methods compared}
 
 \begin{enumerate}[label=(M\arabic*),leftmargin=*]
-\item \emph{Sequential simulated maximum likelihood.} A fixed parameters NB model is reduced by backward elimination at the 5\% level. Each retained coefficient is then specified as random (500 Halton draws) and kept random if the $t$-statistic of its standard deviation exceeds 1.96, otherwise fixed. This mimics the procedure described in Section~\ref{sec:background}.
-\item \emph{Sequential Bayesian.} The same sequence with full Bayesian estimation, vague inverse-gamma priors on variances, and random versus fixed decided by the deviance information criterion.
-\item \emph{Information criterion search.} A greedy forward and backward search over the three states of every candidate that minimizes the Bayesian information criterion, a simple stand-in for the metaheuristic search of \citet{ahern2024extensive}.
+\item \emph{Sequential simulated maximum likelihood.} A fixed parameters NB model is reduced by backward elimination at the 5\% level. All retained coefficients are then specified as random and the model is estimated by simulated maximum likelihood with 200 scrambled Halton draws per site, with standard errors from the outer product of the site-level scores. The random parameter whose standard deviation has the smallest $|t|$ is fixed and the model re-estimated, until every remaining standard deviation has $|t|\ge1.96$. This mimics the procedure described in Section~\ref{sec:background}. As in much applied work, the screening step treats the observations of a site as independent.
+\item \emph{Sequential Bayesian.} The same sequence with full Bayesian estimation, vague inverse-gamma priors on variances, and random versus fixed decided by the deviance information criterion. \tbd{Not yet run.}
+\item \emph{Information criterion search.} A greedy forward and backward search over the three states of every candidate that minimizes the Bayesian information criterion, a simple stand-in for the metaheuristic search of \citet{ahern2024extensive}. \tbd{Not yet run.}
 \item \emph{Proposed, linear mean.} The three-state prior with strong heredity.
 \item \emph{Proposed, flexible mean.} As (M4), with the squares of the continuous covariates added as fixed-only candidates (Remark~\ref{rem:practice}).
 \item \emph{Proposed, weak heredity.} As (M5) with $\pi_{\sigma0}\sim\Betad(1,9)$, used in DGP-D.
 \end{enumerate}
-An oracle that fits the RPNB model at the true specification serves as a benchmark for estimation accuracy. The proposed methods use the default hyperparameters of Section~\ref{sec:prior}, \tbd{number} chains of \tbd{number} iterations after \tbd{number} burn-in, and the median-probability state for each covariate.
+The proposed methods use the default hyperparameters of Section~\ref{sec:prior}, one chain of 3{,}000 iterations of which the first 1{,}000 are discarded, and the median probability rule of Section~\ref{sec:summaries}. In pilot runs, two chains started from different seeds gave posterior state probabilities that agreed to within about $0.1$. In M5 the squared covariates are scaled by their standard deviations but not centered. \tbd{Add an oracle fit at the true specification as a benchmark for estimation accuracy.}
 
 \subsection{Performance measures}
 
 \begin{itemize}[leftmargin=*]
 \item \emph{Specification recovery.} The proportion of replications that recover the entire true state vector, and the three-class accuracy averaged over covariates.
-\item \emph{Random parameter claims.} The true positive rate, false positive rate and false discovery proportion for the claim $\state_j=\mathrm{R}$, and the Matthews correlation coefficient.
+\item \emph{Random parameter claims.} The true positive rate (TPR) and false discovery proportion (FDP) for the claim $\state_j=\mathrm{R}$, and the share of true fixed effects declared random.
+\item \emph{Inclusion.} The share of null covariates selected as fixed or random.
 \item \emph{Calibration.} For the proposed methods, the agreement between $P_j(\mathrm{R})$ and the empirical frequency of $\state_j=\mathrm{R}$ in bins of the posterior probability.
-\item \emph{Estimation.} Root mean squared error and the coverage of 95\% intervals for $\beta_j$ and $|\sigma_j|$, and for $r$.
-\item \emph{Prediction.} Log predictive density on held-out sites, and on a held-out final period in panel designs \citep{vehtari2017practical}.
-\item \emph{Computation.} Run time and effective sample size per second for $|\sigma_j|$ and for the number of selected random parameters.
+\item \emph{Estimation.} Root mean squared error and the coverage of 95\% intervals for $\beta_j$ and $|\sigma_j|$ of the true random parameters, without conditioning on selection. For M1 the interval is the Wald interval of the final model, and a parameter that is not selected as random has $|\hat\sigma_j|=0$ with a degenerate interval. For M4 and M5 the intervals are equal-tailed posterior intervals averaged over specifications.
+\item \emph{Prediction.} Log predictive density on held-out sites, and on a held-out final period in panel designs \citep{vehtari2017practical}. \tbd{Not yet computed.}
+\item \emph{Computation.} Run time per data set.
 \end{itemize}
 
 \subsection{Results}
 
-\tbd{Insert results after running the simulation. Do not interpret before the numbers are in. Expected patterns to check, derived from Section~\ref{sec:identification}: (i) sequential procedures declare spurious random parameters more often as $p$ grows, (ii) under DGP-B, M1 to M4 select a random parameter on $x_1$ in cross-sectional data and M5 does not, (iii) under DGP-C, all methods confuse varying dispersion with a random parameter more often when $T=1$ than when $T=5$.}
+\tbd{RESULTS-TEXT}
 
-\begin{table}[ht]
+\begin{table}[!htbp]
 \centering
 \begin{threeparttable}
-\caption{Specification recovery under DGP-A ($p=20$, $\rho=0.5$, $r=1$). Entries are averages over 200 replications.}
+\caption{Specification recovery under DGP-A ($p=20$, $\rho=0.5$, $r=1$). Entries are averages over 100 replications.}
 \label{tab:sim-recovery}
+\small
 \begin{tabular}{llcccc}
 \toprule
  & & \multicolumn{2}{c}{$n=300$} & \multicolumn{2}{c}{$n=1000$} \\
 \cmidrule(lr){3-4}\cmidrule(lr){5-6}
 Method & Measure & $T=1$ & $T=5$ & $T=1$ & $T=5$ \\
 \midrule
-\multirow{3}{*}{M1 Sequential SML} & Exact recovery & -- & -- & -- & -- \\
- & TPR / FPR (R) & -- & -- & -- & -- \\
- & FDP (R) & -- & -- & -- & -- \\
-\midrule
-\multirow{3}{*}{M2 Sequential Bayes} & Exact recovery & -- & -- & -- & -- \\
- & TPR / FPR (R) & -- & -- & -- & -- \\
- & FDP (R) & -- & -- & -- & -- \\
-\midrule
-\multirow{3}{*}{M3 BIC search} & Exact recovery & -- & -- & -- & -- \\
- & TPR / FPR (R) & -- & -- & -- & -- \\
- & FDP (R) & -- & -- & -- & -- \\
-\midrule
-\multirow{3}{*}{M4 Proposed, linear} & Exact recovery & -- & -- & -- & -- \\
- & TPR / FPR (R) & -- & -- & -- & -- \\
- & FDP (R) & -- & -- & -- & -- \\
-\midrule
-\multirow{3}{*}{M5 Proposed, flexible} & Exact recovery & -- & -- & -- & -- \\
- & TPR / FPR (R) & -- & -- & -- & -- \\
- & FDP (R) & -- & -- & -- & -- \\
+\input{tables/dgpA_recovery_rows}
 \bottomrule
 \end{tabular}
 \begin{tablenotes}\footnotesize
-\item TPR, FPR and FDP refer to the claim that a parameter is random. Placeholders until the simulation is run.
+\item Exact recovery: all 20 states correct. Three-state accuracy: share of candidates whose state is correct. TPR (R): share of the three true random parameters selected as random. Fixed declared R: share of the four true fixed effects selected as random. FDP (R): false discovery proportion among parameters selected as random (zero when none is selected). Null included: share of the 13 null candidates selected as fixed or random. MCSE-NOTE
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
 
-\begin{table}[ht]
+\begin{table}[!htbp]
 \centering
 \begin{threeparttable}
-\caption{Rate of spurious random parameters under omitted curvature (DGP-B, covariate $x_1$) and varying dispersion (DGP-C, covariate $x_{11}$), $n=1000$.}
-\label{tab:sim-spurious}
-\begin{tabular}{lcccc}
+\caption{Estimation of the three true random parameters under DGP-A: root mean squared error (RMSE) and coverage of nominal 95\% intervals for the mean $\beta_j$ and the standard deviation $|\sigma_j|$, pooled over $x_1$, $x_2$ and $x_{11}$ and over 100 replications.}
+\label{tab:sim-estimation}
+\small
+\begin{tabular}{lcccccccc}
 \toprule
- & \multicolumn{2}{c}{DGP-B} & \multicolumn{2}{c}{DGP-C} \\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}
-Method & $T=1$ & $T=5$ & $T=1$ & $T=5$ \\
+ & \multicolumn{4}{c}{$T=1$} & \multicolumn{4}{c}{$T=5$} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+ & \multicolumn{2}{c}{$\beta_j$} & \multicolumn{2}{c}{$|\sigma_j|$} & \multicolumn{2}{c}{$\beta_j$} & \multicolumn{2}{c}{$|\sigma_j|$} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+Method & RMSE & Cover. & RMSE & Cover. & RMSE & Cover. & RMSE & Cover. \\
 \midrule
-M1 Sequential SML & -- & -- & -- & -- \\
-M2 Sequential Bayes & -- & -- & -- & -- \\
-M3 BIC search & -- & -- & -- & -- \\
-M4 Proposed, linear & -- & -- & -- & -- \\
-M5 Proposed, flexible & -- & -- & -- & -- \\
+\multicolumn{9}{l}{\emph{$n=300$}}\\
+\input{tables/dgpA_estimation_rows_n300}
+\midrule
+\multicolumn{9}{l}{\emph{$n=1000$}}\\
+\input{tables/dgpA_estimation_rows_n1000}
 \bottomrule
 \end{tabular}
 \begin{tablenotes}\footnotesize
-\item Placeholders until the simulation is run.
+\item Errors and coverage are computed without conditioning on selection. For M1, a parameter that is not selected as random has $|\hat\sigma_j|=0$ and a degenerate interval, and one that is excluded has $\hat\beta_j=0$. For M4 and M5, estimates are posterior means and intervals are equal-tailed posterior intervals, both averaged over specifications.
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/dgpA_detection}
+\caption{Specification recovery under DGP-A by design. Points are averages over 100 replications and bars are 95\% Monte Carlo intervals. (a) Share of the three true random parameters selected as random. (b) Share of the four true fixed effects selected as random. (c) Share of the 13 null candidates selected as fixed or random. (d) Share of replications in which all 20 states are correct.}
+\label{fig:detection}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/dgpA_state_probabilities}
+\caption{Posterior state probabilities from M4 for one cross-sectional and one panel data set from DGP-A with $n=1000$. Both are the first replication of their design and were not selected on their results. Bars are ordered by true state. Numbers inside the bars are shown when a state has probability of at least $0.16$.}
+\label{fig:stateprobs}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/dgpA_selection_heatmap}
+\caption{Share of replications in which each candidate is selected as random (top) and as fixed or random (bottom), by method and design. Rows are grouped by true state: random (R), fixed (F) and excluded (E). Columns within each panel are the designs, labeled by $n$ and $T$.}
+\label{fig:heatmap}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/dgpA_calibration}
+\caption{Calibration of the posterior probability of being random, $P_j(\mathrm{R})$, from M4 under DGP-A. Candidates from all replications of a design are grouped into bins of width $0.1$. Each marker shows the mean $P_j(\mathrm{R})$ in a bin against the share of those candidates that are truly random. Points on the diagonal indicate calibrated probabilities.}
+\label{fig:calibration}
+\end{figure}
+
+\tbd{DGP-B and DGP-C (omitted curvature and varying dispersion) are designed and coded but not yet run. They will test Corollary~\ref{cor:confounding} directly.}

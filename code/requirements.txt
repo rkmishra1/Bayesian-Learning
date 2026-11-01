@@ -1,0 +1,7 @@
+numpy>=2.0
+scipy>=1.13
+matplotlib>=3.9
+numba>=0.60
+polyagamma>=2.0
+pandas>=2.2
+joblib>=1.4
