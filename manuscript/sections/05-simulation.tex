@@ -153,4 +153,41 @@ Method & RMSE & Cover. & RMSE & Cover. & RMSE & Cover. & RMSE & Cover. \\
 \label{fig:calibration}
 \end{figure}
 
-\tbd{DGP-B and DGP-C (omitted curvature and varying dispersion) are designed and coded but not yet run. They will test Corollary~\ref{cor:confounding} directly.}
+\subsection{Omitted curvature and varying dispersion}\label{sec:sim-bc}
+
+DGP-B and DGP-C have no random parameters, so any parameter declared random is spurious. They test the two mechanisms of Corollary~\ref{cor:confounding}: a convex effect of $x_1$ omitted from a linear mean (DGP-B), and a dispersion that depends on $x_{11}$ (DGP-C). We use $n=1000$ sites with $T=1$ and $T=5$ and 100 replications per design.
+
+\tbd{BC-TEXT}
+
+\IfFileExists{tables/dgpBC_spurious_rows.tex}{%
+\begin{table}[!htbp]
+\centering
+\begin{threeparttable}
+\caption{Spurious random parameters under omitted curvature (DGP-B, target $x_1$) and varying dispersion (DGP-C, target $x_{11}$), $n=1000$, 100 replications per design.}
+\label{tab:sim-spurious}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccccccc}
+\toprule
+ & \multicolumn{4}{c}{DGP-B} & \multicolumn{4}{c}{DGP-C} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+ & \multicolumn{2}{c}{$T=1$} & \multicolumn{2}{c}{$T=5$} & \multicolumn{2}{c}{$T=1$} & \multicolumn{2}{c}{$T=5$} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+Method & Target & Any & Target & Any & Target & Any & Target & Any \\
+\midrule
+\tablerows{tables/dgpBC_spurious_rows.tex}
+\bottomrule
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item Target: share of replications in which the target covariate is declared random. Any: share of replications in which at least one of the 20 candidates is declared random. Both are error rates, since neither process has random parameters.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/dgpBC_spurious}
+\caption{Spurious random parameters under DGP-B (convex effect of $x_1$, no random parameters) and DGP-C (dispersion depending on $x_{11}$, no random parameters), $n=1000$. Top: share of replications in which the target covariate is declared random. Bottom: share in which at least one candidate is declared random. Bars are 95\% Monte Carlo intervals.}
+\label{fig:spurious}
+\end{figure}
+}{\tbd{DGP-B and DGP-C table and figure appear here once scripts/analyze\_bc.py has been run.}}
