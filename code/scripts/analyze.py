@@ -20,15 +20,19 @@ import pandas as pd  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 
 # ----------------------------------------------------------------------------- style
-# Reference palette from the dataviz skill: categorical slots in fixed order, validated
-# for colour-vision deficiency (all-pairs) for the first three slots.
+# Reference palette from the dataviz skill. The five method colours were validated for
+# colour-vision deficiency in the drawing order M1..M5 (adjacent pairs). The proposed
+# methods get the two strongest hues, and every method also has its own marker shape.
 INK, INK2, MUTED = "#0b0b0b", "#52514e", "#898781"
 GRID, AXIS, SURFACE = "#e1e0d9", "#c3c2b7", "#ffffff"
 METHODS = {
-    "M1": dict(label="M1 Sequential SML", color="#2a78d6", marker="o"),
-    "M4": dict(label="M4 Proposed, linear mean", color="#eb6834", marker="s"),
-    "M5": dict(label="M5 Proposed, flexible mean", color="#1baf7a", marker="D"),
+    "M1": dict(label="M1 Sequential SML", color="#1baf7a", marker="D"),
+    "M2": dict(label="M2 Sequential Bayes (DIC)", color="#eda100", marker="^"),
+    "M3": dict(label="M3 BIC search", color="#e87ba4", marker="v"),
+    "M4": dict(label="M4 Proposed, linear mean", color="#2a78d6", marker="o"),
+    "M5": dict(label="M5 Proposed, flexible mean", color="#eb6834", marker="s"),
 }
+ACTIVE: list[str] = list(METHODS)  # methods present in every record, set in main()
 SEQ_BLUE = ["#ffffff", "#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
 STATE_NAME = {0: "E", 1: "F", 2: "R"}
 
@@ -77,10 +81,18 @@ def _save(fig, figdir: Path, name: str):
 
 
 # ----------------------------------------------------------------------------- load
-def load(raw: str) -> list[dict]:
+def load(raw: str, raw_extra: str | None = None) -> list[dict]:
+    """Load main records and merge extra methods (M2, M3) stored per (cell, replication)."""
     recs = [json.load(open(f)) for f in sorted(glob.glob(f"{raw}/*.json"))]
     if not recs:
         raise SystemExit(f"no results in {raw}")
+    if raw_extra:
+        extra = {(e["cell"], e["rep"]): e for e in (json.load(open(f)) for f in glob.glob(f"{raw_extra}/*.json"))}
+        for r in recs:
+            e = extra.get((r["cell"], r["rep"]))
+            if e is not None:
+                for m in ("M2", "M3"):
+                    r[m] = e[m]
     return recs
 
 
@@ -92,7 +104,7 @@ def rep_metrics(recs) -> pd.DataFrame:
     rows = []
     for r in recs:
         t = np.array(r["true_states"])
-        for m in METHODS:
+        for m in ACTIVE:
             s = np.array(r[m]["states"])
             nR = int((s == 2).sum())
             rows.append(dict(
@@ -127,14 +139,18 @@ def estimation(recs) -> pd.DataFrame:
     for r in recs:
         tb, ts = np.array(r["true_beta"]), np.array(r["true_sigma"])
         J = np.nonzero(ts > 0)[0]
-        for m in METHODS:
+        for m in ACTIVE:
             e = r[m]
-            if m == "M1":
+            if m in ("M1", "M3"):  # Wald intervals from the final ML fit
                 b, s = np.array(e["beta"]), np.abs(np.array(e["sigma"]))
                 bse = np.nan_to_num(np.array(e["beta_se"], dtype=float))
                 sse = np.nan_to_num(np.array(e["sigma_se"], dtype=float))
                 blo, bhi = b - 1.96 * bse, b + 1.96 * bse
                 slo, shi = np.maximum(s - 1.96 * sse, 0), s + 1.96 * sse
+            elif m == "M2":  # posterior intervals from the final Bayesian fit
+                b, s = np.array(e["beta"]), np.array(e["sigma"])
+                blo, bhi = np.array(e["beta_lo"]), np.array(e["beta_hi"])
+                slo, shi = np.array(e["sigma_lo"]), np.array(e["sigma_hi"])
             else:
                 b, s = np.array(e["beta_mean"]), np.array(e["sigma_mean"])
                 blo, bhi = np.array(e["beta_lo"]), np.array(e["beta_hi"])
@@ -160,7 +176,7 @@ def per_covariate(recs) -> pd.DataFrame:
     rows = []
     for r in recs:
         t = r["true_states"]
-        for m in METHODS:
+        for m in ACTIVE:
             for j, s in enumerate(r[m]["states"]):
                 rows.append(dict(n=r["n"], T=r["T"], method=m, j=j, truth=t[j],
                                  sel_R=float(s == 2), sel_incl=float(s > 0)))
@@ -177,15 +193,17 @@ def fig_detection(summ: pd.DataFrame, figdir: Path):
         ("exact", "(d) Whole specification recovered", "Share of replications with\nall 20 states correct"),
     ]
     fig, axes = plt.subplots(2, 2, figsize=(6.6, 5.0), sharex=True)
-    offs = {"M1": -0.18, "M4": 0.0, "M5": 0.18}
+    offs = dict(zip(ACTIVE, np.linspace(-0.3, 0.3, len(ACTIVE)) if len(ACTIVE) > 1 else [0.0]))
     for ax, (col, title, ylab) in zip(axes.ravel(), panels):
-        for m, sty in METHODS.items():
+        for m in ACTIVE:
+            sty = METHODS[m]
             sub = summ[summ.method == m].set_index(["n", "T"])
             x = np.arange(len(designs)) + offs[m]
             yv = np.array([sub.loc[tuple(d), col] for d in designs])
             ye = np.array([sub.loc[tuple(d), col + "_se"] for d in designs]) * 1.96
-            ax.errorbar(x, yv, yerr=ye, fmt="none", ecolor=sty["color"], elinewidth=1.2, capsize=0, alpha=0.9, zorder=2)
-            ax.plot(x, yv, linestyle="none", marker=sty["marker"], markersize=6.5, color=sty["color"],
+            ax.errorbar(x, yv, yerr=ye, fmt="none", ecolor=sty["color"], elinewidth=1.1, capsize=0, alpha=0.9, zorder=2)
+            ms = 6.6 if sty["marker"] in "^v" else 5.6  # triangles read smaller at equal size
+            ax.plot(x, yv, linestyle="none", marker=sty["marker"], markersize=ms, color=sty["color"],
                     markeredgecolor=SURFACE, markeredgewidth=1.4, label=sty["label"], zorder=3)
         ax.set_title(title, color=INK)
         ax.set_ylabel(ylab)
@@ -199,8 +217,10 @@ def fig_detection(summ: pd.DataFrame, figdir: Path):
         ax.set_xticks(range(len(designs)))
         ax.set_xticklabels([f"n = {n}\nT = {T}" for n, T in designs])
     h, lab = axes[0, 0].get_legend_handles_labels()
-    fig.legend(h, lab, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.03), handletextpad=0.3, columnspacing=1.6)
-    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    ncol = 3 if len(ACTIVE) <= 3 else 3
+    fig.legend(h, lab, loc="upper center", ncol=ncol, bbox_to_anchor=(0.5, 1.06), handletextpad=0.3,
+               columnspacing=1.4)
+    fig.tight_layout(rect=(0, 0, 1, 0.94 if len(ACTIVE) > 3 else 0.96))
     _save(fig, figdir, "dgpA_detection")
 
 
@@ -210,16 +230,17 @@ def fig_heatmap(pc: pd.DataFrame, figdir: Path):
     order = list(truth[truth == 2].index) + list(truth[truth == 1].index) + list(truth[truth == 0].index)
     ylabels = [f"x{j + 1}  ({STATE_NAME[truth[j]]})" for j in order]
     cmap = LinearSegmentedColormap.from_list("seqblue", SEQ_BLUE)
-    fig, axes = plt.subplots(2, 3, figsize=(6.6, 7.4), sharey=True)
+    nm = len(ACTIVE)
+    fig, axes = plt.subplots(2, nm, figsize=(6.6 if nm <= 3 else 7.0, 7.4), sharey=True, squeeze=False)
     rows = [("sel_R", "Selected as random"), ("sel_incl", "Selected as fixed or random")]
     for r_i, (col, rlab) in enumerate(rows):
-        for c_i, m in enumerate(METHODS):
+        for c_i, m in enumerate(ACTIVE):
             ax = axes[r_i, c_i]
             sub = pc[pc.method == m].set_index(["j", "n", "T"])[col]
             M = np.array([[sub.loc[(j, n, T)] for (n, T) in designs] for j in order])
             im = ax.imshow(M, cmap=cmap, vmin=0, vmax=1, aspect="auto", interpolation="nearest")
             ax.set_xticks(range(len(designs)))
-            ax.set_xticklabels([f"{n}\n{T}" for n, T in designs], fontsize=7.5)
+            ax.set_xticklabels([f"{n}\n{T}" for n, T in designs], fontsize=6.5 if nm > 3 else 7.5)
             ax.set_yticks(range(len(order)))
             ax.set_yticklabels(ylabels, fontsize=7.5)
             for b in (2.5, 6.5):  # separators between truth groups
@@ -230,7 +251,9 @@ def fig_heatmap(pc: pd.DataFrame, figdir: Path):
             for s in ax.spines.values():
                 s.set_visible(False)
             if r_i == 0:
-                ax.set_title(METHODS[m]["label"].replace("Proposed, ", "Proposed,\n"), fontsize=8.5)
+                lab = METHODS[m]["label"]
+                lab = lab.replace("Proposed, ", "Proposed,\n").replace("Sequential ", "Sequential\n").replace("BIC search", "BIC\nsearch")
+                ax.set_title(lab, fontsize=7.5 if nm > 3 else 8.5)
             if c_i == 0:
                 ax.set_ylabel(rlab, color=INK)
         axes[r_i, 0].annotate("n\nT", xy=(-0.02, -0.02), xycoords="axes fraction", ha="right", va="top",
@@ -344,7 +367,8 @@ def table_recovery(summ: pd.DataFrame, tabdir: Path, reps: int):
             ("R_tpr", "TPR (R)"), ("R_on_fixed", "Fixed declared R"), ("R_fdp", "FDP (R)"),
             ("incl_fpr", "Null included")]
     L = []
-    for m, sty in METHODS.items():
+    for m in ACTIVE:
+        sty = METHODS[m]
         sub = summ[summ.method == m].set_index(["n", "T"])
         for i, (col, lab) in enumerate(rows):
             head = f"\\multirow{{{len(rows)}}}{{*}}{{{sty['label']}}}" if i == 0 else ""
@@ -359,7 +383,7 @@ def table_recovery(summ: pd.DataFrame, tabdir: Path, reps: int):
 def table_estimation(est: pd.DataFrame, tabdir: Path):
     designs = est[["n", "T"]].drop_duplicates().sort_values(["n", "T"]).values.tolist()
     L = []
-    for m, sty in METHODS.items():
+    for m in ACTIVE:
         sub = est[est.method == m].set_index(["n", "T"])
         cells = []
         for d in designs:
@@ -367,7 +391,7 @@ def table_estimation(est: pd.DataFrame, tabdir: Path):
             cells.append(f"{x.beta_rmse:.2f} & {x.beta_cov:.2f} & {x.sigma_rmse:.2f} & {x.sigma_cov:.2f}")
         L.append(f"{m} & " + " & ".join(cells[:2]) + " \\\\")
     L2 = []
-    for m, sty in METHODS.items():
+    for m in ACTIVE:
         sub = est[est.method == m].set_index(["n", "T"])
         cells = []
         for d in designs[2:]:
@@ -381,11 +405,15 @@ def table_estimation(est: pd.DataFrame, tabdir: Path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", default="results/dgpA/raw")
+    ap.add_argument("--raw_extra", default="results/dgpA/raw_m23")
     ap.add_argument("--out", default="results/dgpA")
     ap.add_argument("--fig", default="../manuscript/figures")
     ap.add_argument("--tab", default="../manuscript/tables")
     a = ap.parse_args()
-    recs = load(a.raw)
+    global ACTIVE
+    recs = load(a.raw, a.raw_extra)
+    ACTIVE = [m for m in METHODS if all(m in r for r in recs)]
+    print("methods:", ACTIVE)
     out, figdir, tabdir = Path(a.out), Path(a.fig), Path(a.tab)
     out.mkdir(parents=True, exist_ok=True)
     df = rep_metrics(recs)
