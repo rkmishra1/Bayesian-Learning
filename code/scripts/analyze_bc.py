@@ -101,8 +101,8 @@ def figure(summ, methods, figdir: Path):
             if c_i == 0:
                 ax.set_ylabel(ylab.replace(" declared", "\ndeclared").replace("parameter ", "parameter\n"))
     h, lab = axes[0, 0].get_legend_handles_labels()
-    fig.legend(h, lab, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.07), handletextpad=0.3, columnspacing=1.4)
-    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    fig.legend(h, lab, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.035), handletextpad=0.3, columnspacing=1.4)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
     A._save(fig, figdir, "dgpBC_spurious")
 
 
@@ -114,9 +114,10 @@ def table(summ, methods, tabdir: Path):
             for T in (1, 5):
                 x = summ[(summ.dgp == dgp) & (summ["T"] == T) & (summ.method == m)]
                 vals.append(f"{x.target_R.iloc[0]:.2f} & {x.any_R.iloc[0]:.2f}" if len(x) else "-- & --")
-        L.append(f"{A.METHODS[m]['label']} & " + " & ".join(vals) + " \\\\")
+        lab = A.METHODS[m]["label"].replace(" ", "\\\\ ", 1)
+        L.append(f"\\shortstack[l]{{{lab}}} & " + " & ".join(vals) + " \\\\")
     tabdir.mkdir(parents=True, exist_ok=True)
-    (tabdir / "dgpBC_spurious_rows.tex").write_text("\n".join(L) + "\n")
+    (tabdir / "dgpBC_spurious_rows.tex").write_text("\n\\addlinespace\n".join(L) + "\n")
 
 
 def main():

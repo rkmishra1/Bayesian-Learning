@@ -19,6 +19,9 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 | `rpsel/summaries.py` | Posterior state probabilities, decision rules, effect summaries |
 | `scripts/run_sim.py` | Simulation driver (parallel, resumable, one JSON per replication) |
 | `scripts/analyze.py` | Metrics, LaTeX table rows and figures |
+| `rpsel/bayes_seq.py` | Method M2: Bayesian backward elimination on 95% credible intervals, then one-at-a-time random specification by conditional DIC |
+| `rpsel/bic_search.py` | Method M3: two-stage greedy BIC search (excluded/fixed, then fixed/random) |
+| `scripts/run_m23.py`, `scripts/analyze_bc.py` | Driver for M2/M3, analysis of DGP-B and DGP-C |
 | `scripts/check_formulas.py` | Monte Carlo and quadrature checks of Propositions 1 to 3 and the Bayes factors |
 | `results/dgpA/` | Raw replications, summary CSVs and the run log for DGP-A |
 
@@ -30,8 +33,25 @@ python scripts/analyze.py --raw results/dgpA/raw --out results/dgpA \
     --fig ../manuscript/figures --tab ../manuscript/tables
 ```
 
+Competing procedures M2 (sequential Bayes with DIC) and M3 (BIC search) use the same
+seeds and are merged by `analyze.py`:
+
+```bash
+python scripts/run_m23.py --dgp A --reps 100 --jobs 4 --out results/dgpA/raw_m23
+```
+
+Omitted curvature (DGP-B) and varying dispersion (DGP-C), n = 1000 only:
+
+```bash
+python scripts/run_sim.py --dgp B --reps 100 --jobs 4 --cells 2,3 --out results/dgpB/raw
+python scripts/run_sim.py --dgp C --reps 100 --jobs 4 --cells 2,3 --out results/dgpC/raw
+python scripts/analyze_bc.py --fig ../manuscript/figures --tab ../manuscript/tables
+```
+
 Seeds are derived from the DGP, cell and replication index, so reruns reproduce the
-stored results. With 4 cores the full DGP-A run takes about two hours.
+stored results, and every driver skips replications that already have a result file.
+With 4 cores the DGP-A run takes about 1.5 hours, M2/M3 about 2.5 hours (M2 needs about
+ten Bayesian fits per data set), and DGP-B and DGP-C about 75 minutes each.
 
 ## Settings used
 
