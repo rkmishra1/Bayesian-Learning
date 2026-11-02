@@ -1,0 +1,17 @@
+iter 500: r=19.91 fixed=15 random=11 398.8s
+iter 1000: r=25.61 fixed=14 random=11 631.4s
+iter 1500: r=26.94 fixed=14 random=13 818.0s
+iter 2000: r=29.45 fixed=14 random=12 998.2s
+iter 2500: r=32.92 fixed=15 random=13 1179.3s
+iter 3000: r=32.75 fixed=14 random=14 1376.5s
+iter 3500: r=34.52 fixed=14 random=13 1746.1s
+iter 4000: r=34.58 fixed=15 random=10 2115.2s
+iter 4500: r=31.76 fixed=15 random=9 2497.1s
+iter 5000: r=33.32 fixed=14 random=11 2755.4s
+iter 5500: r=36.21 fixed=15 random=14 2940.4s
+iter 6000: r=36.48 fixed=14 random=14 3120.1s
+iter 6500: r=35.98 fixed=14 random=10 3298.4s
+iter 7000: r=35.32 fixed=14 random=10 3480.8s
+iter 7500: r=36.89 fixed=15 random=11 3658.7s
+iter 8000: r=34.61 fixed=14 random=12 3835.5s
+{"lpd": -28109.08585346766, "lpd_mean": -1.6400656895657657, "mae": 1.3660728474839003, "rmse": 2.035220471921318, "n": 17139} 3836s

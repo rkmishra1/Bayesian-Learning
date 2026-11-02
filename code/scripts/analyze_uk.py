@@ -259,7 +259,7 @@ def table_predict(recs, res: Path, tabdir: Path):
         row = dict(method=m, elpd=lpd[m].sum(), d_elpd=d.sum(), se=se, mae=mae, rmse=rmse, n_random=n_rand,
                    ri=bool(ri), minutes=sec)
         rows.append(row)
-        dtxt = "0" if m == best else f"{fmt(d.sum(), 1)} ({se:.1f})"
+        dtxt = "0" if m == best else f"{d.sum():.1f} ({se:.1f})"
         L.append(f"{m} & {n_rand}{' + RI' if ri else ''} & {lpd[m].sum():,.1f} & {dtxt} & "
                  f"{mae:.3f} & {rmse:.3f} & {sec:.0f} \\\\".replace(",", "{,}").replace("-", "$-$"))
     (tabdir / "uk_predict_rows.tex").write_text("\n".join(L) + "\n")
