@@ -4,4 +4,4 @@ Highlights (Elsevier: 3 to 5 bullets, at most 85 characters each, submitted as a
 - A three-state spike-and-slab prior labels each effect excluded, fixed or random
 - Specification recovered in 60% of panel replications, against 1% for sequential tests
 - Squared covariates as candidates stop omitted curvature posing as heterogeneity
-- Every method mistakes covariate-dependent dispersion for a random parameter
+- Selecting dispersion covariates stops varying dispersion posing as heterogeneity

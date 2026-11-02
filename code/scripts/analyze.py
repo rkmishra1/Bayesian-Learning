@@ -35,6 +35,7 @@ METHODS = {
     "M3": dict(label="M3 BIC search", color="#e87ba4", marker="v"),
     "M4": dict(label="M4 Proposed, linear mean", color="#2a78d6", marker="o"),
     "M5": dict(label="M5 Proposed, flexible mean", color="#eb6834", marker="s"),
+    "M6": dict(label="M6 Proposed, mean and dispersion", color="#6250d6", marker="P"),
 }
 ACTIVE: list[str] = list(METHODS)  # methods present in every record, set in main()
 SEQ_BLUE = ["#ffffff", "#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
@@ -90,13 +91,16 @@ def load(raw: str, raw_extra: str | None = None) -> list[dict]:
     recs = [json.load(open(f)) for f in sorted(glob.glob(f"{raw}/*.json"))]
     if not recs:
         raise SystemExit(f"no results in {raw}")
-    if raw_extra:
-        extra = {(e["cell"], e["rep"]): e for e in (json.load(open(f)) for f in glob.glob(f"{raw_extra}/*.json"))}
+    for d in (raw_extra or "").split(","):
+        if not d:
+            continue
+        extra = {(e["cell"], e["rep"]): e for e in (json.load(open(f)) for f in glob.glob(f"{d}/*.json"))}
         for r in recs:
             e = extra.get((r["cell"], r["rep"]))
             if e is not None:
-                for m in ("M2", "M3"):
-                    r[m] = e[m]
+                for m in ("M2", "M3", "M6"):
+                    if m in e:
+                        r[m] = e[m]
     return recs
 
 
@@ -206,7 +210,7 @@ def fig_detection(summ: pd.DataFrame, figdir: Path):
             yv = np.array([sub.loc[tuple(d), col] for d in designs])
             ye = np.array([sub.loc[tuple(d), col + "_se"] for d in designs]) * 1.96
             ax.errorbar(x, yv, yerr=ye, fmt="none", ecolor=sty["color"], elinewidth=1.1, capsize=0, alpha=0.9, zorder=2)
-            ms = 6.6 if sty["marker"] in "^v" else 5.6  # triangles read smaller at equal size
+            ms = 6.6 if sty["marker"] in "^vP" else 5.6  # triangles and plus read smaller at equal size
             ax.plot(x, yv, linestyle="none", marker=sty["marker"], markersize=ms, color=sty["color"],
                     markeredgecolor=SURFACE, markeredgewidth=1.4, label=sty["label"], zorder=3)
         ax.set_title(title, color=INK)
@@ -235,7 +239,8 @@ def fig_heatmap(pc: pd.DataFrame, figdir: Path):
     ylabels = [f"x{j + 1}  ({STATE_NAME[truth[j]]})" for j in order]
     cmap = LinearSegmentedColormap.from_list("seqblue", SEQ_BLUE)
     nm = len(ACTIVE)
-    fig, axes = plt.subplots(2, nm, figsize=(6.6 if nm <= 3 else 7.0, 7.4), sharey=True, squeeze=False)
+    fig, axes = plt.subplots(2, nm, figsize=(6.6 if nm <= 3 else (7.0 if nm <= 5 else 7.6), 7.4), sharey=True,
+                             squeeze=False)
     rows = [("sel_R", "Selected as random"), ("sel_incl", "Selected as fixed or random")]
     for r_i, (col, rlab) in enumerate(rows):
         for c_i, m in enumerate(ACTIVE):
@@ -256,7 +261,7 @@ def fig_heatmap(pc: pd.DataFrame, figdir: Path):
                 s.set_visible(False)
             if r_i == 0:
                 lab = METHODS[m]["label"]
-                lab = lab.replace("Proposed, ", "Proposed,\n").replace("Sequential ", "Sequential\n").replace("BIC search", "BIC\nsearch")
+                lab = lab.replace("Proposed, ", "Proposed,\n").replace("Sequential ", "Sequential\n").replace("BIC search", "BIC\nsearch").replace("mean and dispersion", "mean and\ndispersion")
                 ax.set_title(lab, fontsize=7.5 if nm > 3 else 8.5)
             if c_i == 0:
                 ax.set_ylabel(rlab, color=INK)
@@ -366,17 +371,18 @@ def fig_state_probs(recs, figdir: Path, designs=((1000, 1), (1000, 5)), rep: int
 
 # ----------------------------------------------------------------------------- tables
 def table_recovery(summ: pd.DataFrame, tabdir: Path, reps: int):
+    """Rows: design blocks of six measures. Columns: methods, so methods compare side by side."""
     designs = summ[["n", "T"]].drop_duplicates().sort_values(["n", "T"]).values.tolist()
     rows = [("exact", "Exact recovery"), ("acc3", "Three-state accuracy"),
             ("R_tpr", "TPR (R)"), ("R_on_fixed", "Fixed declared R"), ("R_fdp", "FDP (R)"),
             ("incl_fpr", "Null included")]
     L = []
-    for m in ACTIVE:
-        sty = METHODS[m]
-        sub = summ[summ.method == m].set_index(["n", "T"])
+    for n, T in designs:
+        sub = summ[(summ.n == n) & (summ["T"] == T)].set_index("method")
+        n_tex = f"{n:,}".replace(",", "{,}")
         for i, (col, lab) in enumerate(rows):
-            head = f"\\multirow{{{len(rows)}}}{{*}}{{\\shortstack[l]{{{sty['label'].replace(' ', '\\\\ ', 1)}}}}}" if i == 0 else ""
-            vals = " & ".join(f"{sub.loc[tuple(d), col]:.2f}" for d in designs)
+            head = f"\\multirow{{{len(rows)}}}{{*}}{{\\shortstack[l]{{$n={n_tex}$\\\\ $T={T}$}}}}" if i == 0 else ""
+            vals = " & ".join(f"{sub.loc[m, col]:.2f}" for m in ACTIVE)
             L.append(f"{head} & {lab} & {vals} \\\\")
         L.append("\\midrule")
     L = L[:-1]
@@ -443,7 +449,7 @@ def table_rules(recs, tabdir: Path, out: Path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", default="results/dgpA/raw")
-    ap.add_argument("--raw_extra", default="results/dgpA/raw_m23")
+    ap.add_argument("--raw_extra", default="results/dgpA/raw_m23,results/dgpA/raw_m6")
     ap.add_argument("--out", default="results/dgpA")
     ap.add_argument("--fig", default="../manuscript/figures")
     ap.add_argument("--tab", default="../manuscript/tables")

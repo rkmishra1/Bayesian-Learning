@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from numba import njit
 from polyagamma import random_polyagamma
+from scipy.special import digamma, gammaln, polygamma
 
 
 @dataclass
@@ -49,6 +50,13 @@ class SamplerConfig:
     b_r: float = 0.1
     grid_coarse: int = 48
     grid_fine: int = 80
+    # Dispersion selection (method M6), used only when RPSelector receives W:
+    # log r_it = rho0 + w_it' rho, spike-and-slab on each rho_k.
+    tau_rho: float = 0.5
+    a_rho: float = 1.0
+    b_rho: float = 1.0
+    s_rho0: float = 2.0
+    r_floor: float = 0.01  # dispersion bounded below: r_it = max(exp(rho0 + w'rho), r_floor)
     seed: int | None = None
     verbose: bool = False
 
@@ -66,6 +74,23 @@ def _ell_on_grid(sig, q, b):
             d = 1.0 + s2 * q[i]
             acc += -0.5 * np.log(d) + 0.5 * s2 * b[i] * b[i] / d
         out[g] = acc
+    return out
+
+
+@njit(cache=True)
+def _trigamma(x):
+    """Trigamma function for positive arguments: recurrence to x >= 6, then asymptotic series."""
+    out = np.empty(x.shape[0])
+    for i in range(x.shape[0]):
+        z = x[i]
+        acc = 0.0
+        while z < 6.0:
+            acc += 1.0 / (z * z)
+            z += 1.0
+        iz = 1.0 / z
+        iz2 = iz * iz
+        acc += iz + 0.5 * iz2 + iz * iz2 * (1.0 / 6.0 - iz2 * (1.0 / 30.0 - iz2 * (1.0 / 42.0 - iz2 / 30.0)))
+        out[i] = acc
     return out
 
 
@@ -95,8 +120,9 @@ def _crt(y, r, rng):
 class RPSelector:
     """Gibbs sampler for three-state selection of excluded, fixed and random parameters."""
 
-    def __init__(self, y, X, site, offset=None, eligible=None, config: SamplerConfig | None = None):
+    def __init__(self, y, X, site, offset=None, eligible=None, config: SamplerConfig | None = None, W=None):
         self.cfg = config or SamplerConfig()
+        self.W = None if W is None else np.ascontiguousarray(W, dtype=np.float64)
         self.y = np.asarray(y, dtype=np.float64)
         self.X = np.ascontiguousarray(X, dtype=np.float64)
         self.N, self.p = self.X.shape
@@ -144,8 +170,252 @@ class RPSelector:
             t = (-f0 + np.sqrt(f0 * f0 + u * (f1 * f1 - f0 * f0))) / (f1 - f0)
         return grid[k] + t * dx[k]
 
+    # ------------------------------------------------------------------ dispersion block
+    # The dispersion is bounded below, r_it = max(exp(rho0 + w'rho), r_floor). The bound is part
+    # of the model: it is applied identically in the likelihood, its derivatives and the
+    # Polya-Gamma step. With r_floor = 0.01 the variance is at most mu + 100 mu^2, beyond any
+    # realistic crash data, and Polya-Gamma draws with parameter y + r stay well defined.
+    LOGR_MAX = 30.0
+
+    def _nb_ll_r(self, y, logr, lamlog):
+        """NB log likelihood per observation as a function of log r (terms free of r dropped)."""
+        logr = np.clip(logr, self._logr_min, self.LOGR_MAX)
+        r = np.exp(logr)
+        return gammaln(y + r) - gammaln(r) + r * logr - (r + y) * np.logaddexp(logr, lamlog)
+
+    def _nb_derivs(self, y, logr, lamlog):
+        """Derivatives of the NB log likelihood with respect to the unbounded log r.
+
+        Below the floor the likelihood does not depend on log r, so both derivatives are zero.
+        """
+        inside = logr > self._logr_min
+        logr = np.clip(logr, self._logr_min, self.LOGR_MAX)
+        r = np.exp(logr)
+        lse = np.logaddexp(logr, lamlog)
+        rl = np.exp(lse)  # r + lambda
+        d1r = digamma(y + r) - digamma(r) + logr + 1.0 - lse - (r + y) / rl
+        d2r = _trigamma(y + r) - _trigamma(r) + 1.0 / r - 2.0 / rl + (r + y) / rl**2
+        return r * d1r * inside, (r * d1r + r * r * d2r) * inside
+
+    def _laplace_from(self, d1, d2, wk, tau2):
+        """One Newton step from rho_k = 0 given log-likelihood derivatives on the support of w_k."""
+        h = (wk * wk * d2).sum() - 1.0 / tau2
+        if h >= 0:
+            return 0.0, tau2
+        return (wk * d1).sum() / (-h), -1.0 / h
+
+    def _dispersion_block(self, st, lamlog, adapt):
+        """Update rho0 and the (eta_k, rho_k) pairs given the mean on the log scale.
+
+        Switching moves are reversible-jump moves whose proposal for rho_k is a Gaussian
+        (Laplace) approximation computed from the state with rho_k = 0, so the same proposal
+        serves both directions. A second Newton step is taken when the first suggests a clear
+        effect, which is also a function of that state only. Binary candidates are evaluated
+        on their nonzero observations only, and derivatives at the current state are cached.
+        """
+        cfg, rng, y, W = self.cfg, self.rng, self.y, self.W
+        tau2 = cfg.tau_rho**2
+        supp = self._supp
+        logr = st["rho0"] + W @ st["rho"]
+        llv = self._nb_ll_r(y, logr, lamlog)
+        # rho0: random-walk Metropolis on all observations
+        prop = st["rho0"] + st["sd0"] * rng.standard_normal()
+        llv_p = self._nb_ll_r(y, logr + (prop - st["rho0"]), lamlog)
+        la = llv_p.sum() - llv.sum() - 0.5 * (prop**2 - st["rho0"] ** 2) / cfg.s_rho0**2
+        acc = np.log(rng.random()) < la
+        if acc:
+            logr = logr + (prop - st["rho0"])
+            st["rho0"], llv = prop, llv_p
+        if adapt:
+            st["sd0"] *= np.exp(0.05 * (acc - 0.44))
+        cache = None  # derivatives at the current logr, full length
+        lprior = lambda v: -0.5 * np.log(2 * np.pi * tau2) - 0.5 * v * v / tau2
+        for kk in rng.permutation(W.shape[1]):
+            ix = supp[kk]
+            wk = W[ix, kk]
+            yk, lamk = y[ix], lamlog[ix]
+            rk = st["rho"][kk]
+            loff = logr[ix] - wk * rk  # log r on the support with rho_k = 0
+            if rk == 0.0:
+                if cache is None:
+                    cache = self._nb_derivs(y, logr, lamlog)
+                d1, d2 = cache[0][ix], cache[1][ix]
+            else:
+                d1, d2 = self._nb_derivs(yk, loff, lamk)
+            m, v = self._laplace_from(d1, d2, wk, tau2)
+            if 1.5 * np.sqrt(v) < abs(m) <= 3.0:  # second Newton step for a clear, plausible effect
+                e1, e2 = self._nb_derivs(yk, loff + wk * m, lamk)
+                h = (wk * wk * e2).sum() - 1.0 / tau2
+                if h < 0:
+                    m, v = m - ((wk * e1).sum() - m / tau2) / h, -1.0 / h
+            lq = lambda val: -0.5 * np.log(2 * np.pi * v) - 0.5 * (val - m) ** 2 / v
+            pi = st["pi_rho"]
+            ll_cur = llv[ix].sum()
+            if not st["eta"][kk]:
+                new = m + np.sqrt(v) * rng.standard_normal()
+                lnew = self._nb_ll_r(yk, loff + wk * new, lamk)
+                la = lnew.sum() + lprior(new) + np.log(pi) - ll_cur - np.log1p(-pi) - lq(new)
+                if np.log(rng.random()) < la:
+                    st["eta"][kk], st["rho"][kk] = True, new
+                    logr[ix] = loff + wk * new
+                    llv[ix] = lnew
+                    cache = None
+            else:
+                loffv = self._nb_ll_r(yk, loff, lamk)
+                la = loffv.sum() + np.log1p(-pi) + lq(rk) - ll_cur - lprior(rk) - np.log(pi)
+                if np.log(rng.random()) < la:
+                    st["eta"][kk], st["rho"][kk] = False, 0.0
+                    logr[ix] = loff
+                    llv[ix] = loffv
+                    cache = None
+            if st["eta"][kk]:  # within-model random-walk move, composed after the switch move
+                rk = st["rho"][kk]
+                base = logr[ix] - wk * rk
+                new = rk + st["sdk"][kk] * rng.standard_normal()
+                lnew = self._nb_ll_r(yk, base + wk * new, lamk)
+                acc = np.log(rng.random()) < lnew.sum() + lprior(new) - llv[ix].sum() - lprior(rk)
+                if acc:
+                    st["rho"][kk] = new
+                    logr[ix] = base + wk * new
+                    llv[ix] = lnew
+                    cache = None
+                if adapt:
+                    st["sdk"][kk] *= np.exp(0.05 * (acc - 0.44))
+        return logr
+
+    def _run_dispersion(self):
+        """Main loop with covariate-dependent dispersion selection (method M6).
+
+        Mean parameterization: log lambda_it = o + alpha + x'beta + eps, r_it = exp(rho0 + w'rho),
+        and the Polya-Gamma working model uses psi_it = log lambda_it - log r_it.
+        """
+        cfg, rng = self.cfg, self.rng
+        y, X, W, site, n, N, p = self.y, self.X, self.W, self.site, self.n, self.N, self.p
+        qd = W.shape[1]
+        self._supp = [np.nonzero(W[:, kk] != 0)[0] for kk in range(qd)]
+        self._logr_min = float(np.log(cfg.r_floor))
+        floor_hits = 0
+        elig = self.eligible
+        strong = cfg.heredity == "strong"
+        alpha = np.log(max(y.mean(), 0.1)) - np.mean(self.offset)
+        beta = np.zeros(p)
+        sigma = np.zeros(p)
+        gam = np.zeros(p, bool)
+        dlt = np.zeros(p, bool)
+        Z = rng.standard_normal((n, p))
+        pi_b, pi_s1, pi_s0 = 0.5, 0.5, (0.0 if strong else 0.1)
+        tau_b2, tau_s2 = cfg.tau_b**2, cfg.tau_s**2
+        st = dict(rho0=0.0, rho=np.zeros(qd), eta=np.zeros(qd, bool), pi_rho=0.5,
+                  sd0=0.05, sdk=np.full(qd, 0.1))
+        logr = np.zeros(N)
+
+        def mean_log():
+            return self.offset + alpha + X @ beta + (X * (sigma * Z[site])).sum(axis=1)
+
+        lamlog = mean_log()
+        n_keep = (cfg.n_iter - cfg.burn) // cfg.thin
+        tr = {
+            "alpha": np.empty(n_keep), "rho0": np.empty(n_keep),
+            "beta": np.empty((n_keep, p)), "sigma": np.empty((n_keep, p)),
+            "gamma": np.empty((n_keep, p), bool), "delta": np.empty((n_keep, p), bool),
+            "rho": np.empty((n_keep, qd)), "eta": np.empty((n_keep, qd), bool),
+            "pi_b": np.empty(n_keep), "pi_s1": np.empty(n_keep), "pi_rho": np.empty(n_keep),
+        }
+        t0 = time.perf_counter()
+        k = 0
+        for it in range(cfg.n_iter):
+            # 1. dispersion block, Polya-Gamma variables integrated out
+            logr = self._dispersion_block(st, lamlog, adapt=it < cfg.burn)
+            if logr.min() < self._logr_min:
+                floor_hits += 1
+            logr_eff = np.clip(logr, self._logr_min, self.LOGR_MAX)
+            r = np.exp(logr_eff)
+            psi = lamlog - logr_eff
+            # 2. Polya-Gamma variables and working response
+            omega = np.maximum(random_polyagamma(y + r, psi, random_state=rng), 1e-12)
+            ytil = (y - r) / (2.0 * omega)
+            # 3. intercept (mean scale)
+            prec = omega.sum() + 1.0 / cfg.s_alpha**2
+            mean = (omega * (ytil - psi + alpha)).sum() / prec
+            new = mean + rng.standard_normal() / np.sqrt(prec)
+            psi += new - alpha
+            alpha = new
+            # 4. (gamma_j, beta_j)
+            for j in rng.permutation(p):
+                xj = X[:, j]
+                e = ytil - psi + xj * beta[j]
+                wx = omega * xj
+                S = wx @ xj
+                B = wx @ e
+                prec_j = S + 1.0 / tau_b2
+                log_bf = -0.5 * np.log1p(tau_b2 * S) + 0.5 * B * B / prec_j
+                if elig[j]:
+                    h1, h0 = (pi_s1, pi_s0) if dlt[j] else (1.0 - pi_s1, 1.0 - pi_s0)
+                else:
+                    h1 = h0 = 1.0
+                if h0 <= 0.0:
+                    g_new = True
+                else:
+                    lo = np.log(pi_b) - np.log1p(-pi_b) + log_bf + np.log(h1) - np.log(h0)
+                    g_new = rng.random() < 1.0 / (1.0 + np.exp(-lo))
+                b_new = (B / prec_j + rng.standard_normal() / np.sqrt(prec_j)) if g_new else 0.0
+                psi += xj * (b_new - beta[j])
+                beta[j], gam[j] = b_new, g_new
+            # 5. (delta_j, sigma_j, z_.j)
+            for j in rng.permutation(np.nonzero(elig)[0]):
+                xj = X[:, j]
+                u_old = sigma[j] * xj * Z[site, j]
+                pij = pi_s1 if gam[j] else pi_s0
+                if pij <= 0.0:
+                    psi -= u_old
+                    sigma[j], dlt[j] = 0.0, False
+                    Z[:, j] = rng.standard_normal(n)
+                    continue
+                e = ytil - psi + u_old
+                q = np.bincount(site, weights=omega * xj * xj, minlength=n)
+                b = np.bincount(site, weights=omega * xj * e, minlength=n)
+                log_bf, grid, logf = self._bf_sigma(q, b, tau_s2)
+                lo = np.log(pij) - np.log1p(-pij) + log_bf
+                d_new = rng.random() < 1.0 / (1.0 + np.exp(-np.clip(lo, -700, 700)))
+                if d_new:
+                    s = self._draw_abs_sigma(grid, logf) * (1.0 if rng.random() < 0.5 else -1.0)
+                    den = 1.0 + s * s * q
+                    Z[:, j] = s * b / den + rng.standard_normal(n) / np.sqrt(den)
+                else:
+                    s = 0.0
+                    Z[:, j] = rng.standard_normal(n)
+                psi += s * xj * Z[site, j] - u_old
+                sigma[j], dlt[j] = s, d_new
+            # 6. hyperparameters
+            kb = int(gam.sum())
+            pi_b = rng.beta(cfg.a_b + kb, cfg.b_b + p - kb)
+            e1 = elig & gam
+            pi_s1 = rng.beta(cfg.a_s + (dlt & e1).sum(), cfg.b_s + (~dlt & e1).sum())
+            if not strong:
+                e0 = elig & ~gam
+                pi_s0 = rng.beta(cfg.a_s0 + (dlt & e0).sum(), cfg.b_s0 + (~dlt & e0).sum())
+            ke = int(st["eta"].sum())
+            st["pi_rho"] = rng.beta(cfg.a_rho + ke, cfg.b_rho + qd - ke)
+            lamlog = mean_log()
+            if it >= cfg.burn and (it - cfg.burn) % cfg.thin == 0 and k < n_keep:
+                tr["alpha"][k], tr["rho0"][k] = alpha, st["rho0"]
+                tr["beta"][k], tr["sigma"][k] = beta, sigma
+                tr["gamma"][k], tr["delta"][k] = gam, dlt
+                tr["rho"][k], tr["eta"][k] = st["rho"], st["eta"]
+                tr["pi_b"][k], tr["pi_s1"][k], tr["pi_rho"][k] = pi_b, pi_s1, st["pi_rho"]
+                k += 1
+            if cfg.verbose and (it + 1) % 500 == 0:
+                print(f"iter {it + 1}: rho0={st['rho0']:.2f} disp={ke} fixed={kb} random={int(dlt.sum())} "
+                      f"{time.perf_counter() - t0:.1f}s", flush=True)
+        tr["r"] = np.exp(tr["rho0"])
+        tr["floor_hits"] = floor_hits  # sweeps in which the dispersion floor was reached
+        tr["seconds"] = time.perf_counter() - t0
+        return tr
+
     # ------------------------------------------------------------------ main loop
     def run(self):
+        if self.W is not None:
+            return self._run_dispersion()
         cfg, rng = self.cfg, self.rng
         y, X, site, n, N, p = self.y, self.X, self.site, self.n, self.N, self.p
         elig = self.eligible

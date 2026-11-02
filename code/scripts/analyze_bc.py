@@ -28,13 +28,15 @@ TARGET_LABEL = {"B": "x1", "C": "x11"}
 
 def load(dgp: str, root: Path):
     recs = [json.load(open(f)) for f in sorted(glob.glob(str(root / f"dgp{dgp}" / "raw" / "*.json")))]
-    extra = root / f"dgp{dgp}" / "raw_m23"
-    if extra.exists():
+    for sub in ("raw_m23", "raw_m6"):
+        extra = root / f"dgp{dgp}" / sub
+        if not extra.exists():
+            continue
         ex = {(e["cell"], e["rep"]): e for e in (json.load(open(f)) for f in glob.glob(str(extra / "*.json")))}
         for r in recs:
             e = ex.get((r["cell"], r["rep"]))
             if e:
-                r.update({m: e[m] for m in ("M2", "M3")})
+                r.update({m: e[m] for m in ("M2", "M3", "M6") if m in e})
     return recs
 
 
@@ -49,14 +51,20 @@ def metrics(recs, dgp, methods):
                        n_R=float((s == 2).sum()))
             if "P" in r[m]:
                 row["target_PR"] = float(np.array(r[m]["P"])[j0, 2])
-            if m == "M5" and dgp == "B" and "quad_states" in r[m]:
+            if m in ("M5", "M6") and dgp == "B" and "quad_states" in r[m]:
                 row["quad_x1_selected"] = float(r[m]["quad_states"][0] > 0)
+            if "P_disp" in r[m]:
+                pdisp = np.array(r[m]["P_disp"])
+                row["target_disp"] = float(pdisp[j0] > 0.5)
+                row["target_Pdisp"] = float(pdisp[j0])
+                row["other_disp"] = float((np.delete(pdisp, j0) > 0.5).any())
             rows.append(row)
     return pd.DataFrame(rows)
 
 
 def summarize(df):
-    cols = [c for c in ("target_R", "any_R", "n_R", "target_PR", "quad_x1_selected") if c in df]
+    cols = [c for c in ("target_R", "any_R", "n_R", "target_PR", "quad_x1_selected", "target_disp",
+                        "target_Pdisp", "other_disp") if c in df]
     g = df.groupby(["dgp", "n", "T", "method"])
     mean = g[cols].mean()
     se = g[cols].std(ddof=1) / np.sqrt(g.size().values[:, None])
@@ -85,7 +93,7 @@ def figure(summ, methods, figdir: Path):
                 yv = np.array([sm.loc[T, col] for T in Ts])
                 ye = 1.96 * np.array([sm.loc[T, col + "_se"] for T in Ts])
                 ax.errorbar(x, yv, yerr=ye, fmt="none", ecolor=sty["color"], elinewidth=1.1, zorder=2)
-                ms = 6.6 if sty["marker"] in "^v" else 5.6
+                ms = 6.6 if sty["marker"] in "^vP" else 5.6
                 ax.plot(x, yv, linestyle="none", marker=sty["marker"], markersize=ms, color=sty["color"],
                         markeredgecolor=A.SURFACE, markeredgewidth=1.4, label=sty["label"], zorder=3)
             ax.set_xticks(range(len(Ts)))
@@ -101,8 +109,10 @@ def figure(summ, methods, figdir: Path):
             if c_i == 0:
                 ax.set_ylabel(ylab.replace(" declared", "\ndeclared").replace("parameter ", "parameter\n"))
     h, lab = axes[0, 0].get_legend_handles_labels()
-    fig.legend(h, lab, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.035), handletextpad=0.3, columnspacing=1.4)
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    nc = 2 if len(methods) == 4 else 3
+    fig.legend(h, lab, loc="upper center", ncol=nc, bbox_to_anchor=(0.5, 1.06 if len(methods) > 3 else 1.035),
+               handletextpad=0.3, columnspacing=1.4)
+    fig.tight_layout(rect=(0, 0, 1, 0.93 if len(methods) > 3 else 0.95))
     A._save(fig, figdir, "dgpBC_spurious")
 
 
@@ -146,7 +156,8 @@ def main():
     figure(summ, methods, Path(a.fig))
     table(summ, methods, Path(a.tab))
     pd.set_option("display.width", 200)
-    show = [c for c in ("dgp", "n", "T", "method", "reps", "target_R", "any_R", "n_R", "target_PR", "quad_x1_selected") if c in summ]
+    show = [c for c in ("dgp", "n", "T", "method", "reps", "target_R", "any_R", "n_R", "target_PR", "quad_x1_selected",
+                        "target_disp", "target_Pdisp", "other_disp") if c in summ]
     print(summ[show].round(3).to_string(index=False))
 
 
