@@ -57,6 +57,11 @@ class SamplerConfig:
     b_rho: float = 1.0
     s_rho0: float = 2.0
     r_floor: float = 0.01  # dispersion bounded below: r_it = max(exp(rho0 + w'rho), r_floor)
+    # Random intercept (application): the constant is always in the model and is fixed or
+    # random. It is appended to X as a column of ones whose mean stays zero (alpha is the
+    # mean) and whose indicator delta has prior probability pi_ri, outside the beta-binomial.
+    random_intercept: bool = False
+    pi_ri: float = 0.5
     seed: int | None = None
     verbose: bool = False
 
@@ -120,8 +125,12 @@ def _crt(y, r, rng):
 class RPSelector:
     """Gibbs sampler for three-state selection of excluded, fixed and random parameters."""
 
-    def __init__(self, y, X, site, offset=None, eligible=None, config: SamplerConfig | None = None, W=None):
+    def __init__(self, y, X, site, offset=None, eligible=None, config: SamplerConfig | None = None, W=None,
+                 on_keep=None):
         self.cfg = config or SamplerConfig()
+        # optional callback, called at every kept iteration with the current state (e.g. to
+        # accumulate a hold-out predictive density without storing the site draws)
+        self.on_keep = on_keep
         self.W = None if W is None else np.ascontiguousarray(W, dtype=np.float64)
         self.y = np.asarray(y, dtype=np.float64)
         self.X = np.ascontiguousarray(X, dtype=np.float64)
@@ -131,6 +140,12 @@ class RPSelector:
         self.n = int(self.site.max()) + 1
         self.offset = np.zeros(self.N) if offset is None else np.asarray(offset, dtype=np.float64)
         self.eligible = np.ones(self.p, bool) if eligible is None else np.asarray(eligible, bool)
+        self.ri = -1  # index of the random-intercept column, -1 if none
+        if self.cfg.random_intercept:
+            self.X = np.ascontiguousarray(np.hstack([self.X, np.ones((self.N, 1))]))
+            self.eligible = np.r_[self.eligible, True]
+            self.ri = self.p
+            self.p += 1
         self.rng = np.random.default_rng(self.cfg.seed)
 
     # ------------------------------------------------------------------ helpers
@@ -302,6 +317,12 @@ class RPSelector:
         sigma = np.zeros(p)
         gam = np.zeros(p, bool)
         dlt = np.zeros(p, bool)
+        ri = self.ri
+        cand = np.ones(p, bool)  # covariate candidates, excluding the random intercept
+        if ri >= 0:
+            gam[ri] = True  # the constant is always in the model, its mean is alpha
+            cand[ri] = False
+        n_cand = int(cand.sum())
         Z = rng.standard_normal((n, p))
         pi_b, pi_s1, pi_s0 = 0.5, 0.5, (0.0 if strong else 0.1)
         tau_b2, tau_s2 = cfg.tau_b**2, cfg.tau_s**2
@@ -342,6 +363,8 @@ class RPSelector:
             alpha = new
             # 4. (gamma_j, beta_j)
             for j in rng.permutation(p):
+                if j == ri:
+                    continue
                 xj = X[:, j]
                 e = ytil - psi + xj * beta[j]
                 wx = omega * xj
@@ -365,7 +388,7 @@ class RPSelector:
             for j in rng.permutation(np.nonzero(elig)[0]):
                 xj = X[:, j]
                 u_old = sigma[j] * xj * Z[site, j]
-                pij = pi_s1 if gam[j] else pi_s0
+                pij = cfg.pi_ri if j == ri else (pi_s1 if gam[j] else pi_s0)
                 if pij <= 0.0:
                     psi -= u_old
                     sigma[j], dlt[j] = 0.0, False
@@ -387,12 +410,12 @@ class RPSelector:
                 psi += s * xj * Z[site, j] - u_old
                 sigma[j], dlt[j] = s, d_new
             # 6. hyperparameters
-            kb = int(gam.sum())
-            pi_b = rng.beta(cfg.a_b + kb, cfg.b_b + p - kb)
-            e1 = elig & gam
+            kb = int((gam & cand).sum())
+            pi_b = rng.beta(cfg.a_b + kb, cfg.b_b + n_cand - kb)
+            e1 = elig & gam & cand
             pi_s1 = rng.beta(cfg.a_s + (dlt & e1).sum(), cfg.b_s + (~dlt & e1).sum())
             if not strong:
-                e0 = elig & ~gam
+                e0 = elig & ~gam & cand
                 pi_s0 = rng.beta(cfg.a_s0 + (dlt & e0).sum(), cfg.b_s0 + (~dlt & e0).sum())
             ke = int(st["eta"].sum())
             st["pi_rho"] = rng.beta(cfg.a_rho + ke, cfg.b_rho + qd - ke)
@@ -403,6 +426,9 @@ class RPSelector:
                 tr["gamma"][k], tr["delta"][k] = gam, dlt
                 tr["rho"][k], tr["eta"][k] = st["rho"], st["eta"]
                 tr["pi_b"][k], tr["pi_s1"][k], tr["pi_rho"][k] = pi_b, pi_s1, st["pi_rho"]
+                if self.on_keep is not None:
+                    self.on_keep(dict(kind="mean", alpha=alpha, beta=beta, sigma=sigma, Z=Z,
+                                      rho0=st["rho0"], rho=st["rho"]))
                 k += 1
             if cfg.verbose and (it + 1) % 500 == 0:
                 print(f"iter {it + 1}: rho0={st['rho0']:.2f} disp={ke} fixed={kb} random={int(dlt.sum())} "
@@ -428,6 +454,12 @@ class RPSelector:
         sigma = np.zeros(p)
         gam = np.zeros(p, bool)
         dlt = np.zeros(p, bool)
+        ri = self.ri
+        cand = np.ones(p, bool)  # covariate candidates, excluding the random intercept
+        if ri >= 0:
+            gam[ri] = True  # the constant is always in the model, its mean is alpha
+            cand[ri] = False
+        n_cand = int(cand.sum())
         Z = rng.standard_normal((n, p))
         pi_b, pi_s1, pi_s0 = 0.5, 0.5, (0.0 if strong else 0.1)
         tau_b2, xi_b = cfg.tau_b**2, 1.0
@@ -469,6 +501,8 @@ class RPSelector:
 
             # 4. (gamma_j, beta_j), beta_j integrated out for the indicator
             for j in rng.permutation(p):
+                if j == ri:
+                    continue
                 xj = X[:, j]
                 e = ytil - psi + xj * beta[j]
                 wx = omega * xj
@@ -496,7 +530,7 @@ class RPSelector:
             for j in rng.permutation(np.nonzero(elig)[0]):
                 xj = X[:, j]
                 u_old = sigma[j] * xj * Z[site, j]
-                pij = pi_s1 if gam[j] else pi_s0
+                pij = cfg.pi_ri if j == ri else (pi_s1 if gam[j] else pi_s0)
                 if pij <= 0.0:
                     psi -= u_old
                     sigma[j], dlt[j] = 0.0, False
@@ -519,12 +553,12 @@ class RPSelector:
                 sigma[j], dlt[j] = s, d_new
 
             # 6. hyperparameters
-            kb = int(gam.sum())
-            pi_b = rng.beta(cfg.a_b + kb, cfg.b_b + p - kb)
-            e1 = elig & gam
+            kb = int((gam & cand).sum())
+            pi_b = rng.beta(cfg.a_b + kb, cfg.b_b + n_cand - kb)
+            e1 = elig & gam & cand
             pi_s1 = rng.beta(cfg.a_s + (dlt & e1).sum(), cfg.b_s + (~dlt & e1).sum())
             if not strong:
-                e0 = elig & ~gam
+                e0 = elig & ~gam & cand
                 pi_s0 = rng.beta(cfg.a_s0 + (dlt & e0).sum(), cfg.b_s0 + (~dlt & e0).sum())
             ks = int(dlt.sum())
             if cfg.learn_tau:
@@ -546,6 +580,8 @@ class RPSelector:
                 tr["tau_s"][k] = np.sqrt(tau_s2)
                 tr["pi_b"][k] = pi_b
                 tr["pi_s1"][k] = pi_s1
+                if self.on_keep is not None:
+                    self.on_keep(dict(kind="logodds", alpha=alpha, beta=beta, sigma=sigma, Z=Z, r=r))
                 k += 1
             if cfg.verbose and (it + 1) % 500 == 0:
                 print(f"iter {it + 1}: r={r:.2f} fixed={kb} random={ks} "

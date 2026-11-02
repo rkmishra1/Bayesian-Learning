@@ -75,8 +75,9 @@ def backward_elimination(y, X, off, level=0.05):
 
 # ---------------------------------------------------------------------- RPNB by SML
 class _SML:
-    def __init__(self, y, X, site, off, rand_idx, R, seed):
+    def __init__(self, y, X, site, off, rand_idx, R, seed, Xr=None):
         self.y, self.X, self.site, self.off = y, X, site, off
+        self.Xr = X if Xr is None else Xr  # columns that may carry random parameters
         self.rand = np.asarray(rand_idx, dtype=int)
         self.n = int(site.max()) + 1
         m = self.rand.size
@@ -99,7 +100,7 @@ class _SML:
         r = np.exp(theta[-1])
         Hs = self.Hs
         eta = off + alpha + X @ beta
-        eps = np.einsum("nrm,nm->nr", Hs, X[:, self.rand] * sig) if m else 0.0
+        eps = np.einsum("nrm,nm->nr", Hs, self.Xr[:, self.rand] * sig) if m else 0.0
         mu = np.exp(eta[:, None] + eps)  # N x R
         yy = y[:, None]
         lp = _nb_logpmf(yy, mu, r)
@@ -115,7 +116,7 @@ class _SML:
         a_sum = A.sum(axis=1)
         cols += [np.add.reduceat(a_sum * X[:, j], self.starts) for j in range(k)]
         for t, j in enumerate(self.rand):
-            cols.append(np.add.reduceat((A * Hs[:, :, t]).sum(axis=1) * X[:, j], self.starts))
+            cols.append(np.add.reduceat((A * Hs[:, :, t]).sum(axis=1) * self.Xr[:, j], self.starts))
         cols.append(np.add.reduceat((r * d_r * w[site]).sum(axis=1), self.starts))
         return ll_i, np.column_stack(cols)
 
@@ -124,16 +125,20 @@ class _SML:
         return -ll_i.sum(), -S.sum(axis=0)
 
 
-def fit_rpnb(y, X, site, off, rand_idx, theta0, R=200, seed=0):
-    model = _SML(y, X, site, off, rand_idx, R, seed)
+def fit_rpnb(y, X, site, off, rand_idx, theta0, R=200, seed=0, Xr=None):
+    model = _SML(y, X, site, off, rand_idx, R, seed, Xr=Xr)
     res = minimize(model.negll, theta0, jac=True, method="BFGS", options={"gtol": 1e-5, "maxiter": 1000})
     _, S = model.scores(res.x)
     se = np.sqrt(np.clip(np.diag(np.linalg.pinv(S.T @ S)), 1e-300, None))
     return res.x, se, -res.fun
 
 
-def sequential_sml(y, X, site, off, R=200, seed=0, sig0=0.1):
-    """Run M1. Returns states (0/1/2), beta and sigma estimates with Wald 95% intervals."""
+def sequential_sml(y, X, site, off, R=200, seed=0, sig0=0.1, rand_const=False):
+    """Run M1. Returns states (0/1/2), beta and sigma estimates with Wald 95% intervals.
+
+    With rand_const=True the constant is also a candidate random parameter in step 2 and is
+    tested and fixed like the others. Its result is returned as const_sigma (0 if fixed).
+    """
     t0 = time.perf_counter()
     p = X.shape[1]
     active, theta_fixed = backward_elimination(y, X, off)
@@ -147,11 +152,12 @@ def sequential_sml(y, X, site, off, R=200, seed=0, sig0=0.1):
                     seconds=time.perf_counter() - t0, n_refits=0)
     Xa = X[:, active]
     k = len(active)
-    rand = list(range(k))  # positions within Xa
-    theta = np.concatenate([theta_fixed[:k + 1], np.full(k, sig0), [theta_fixed[-1]]])
+    Xr = np.hstack([Xa, np.ones((Xa.shape[0], 1))]) if rand_const else None
+    rand = list(range(k + 1 if rand_const else k))  # positions within Xa (k is the constant)
+    theta = np.concatenate([theta_fixed[:k + 1], np.full(len(rand), sig0), [theta_fixed[-1]]])
     n_refits = 0
     while True:
-        theta, se, _ = fit_rpnb(y, Xa, site, off, rand, theta, R=R, seed=seed)
+        theta, se, ll = fit_rpnb(y, Xa, site, off, rand, theta, R=R, seed=seed, Xr=Xr)
         n_refits += 1
         if not rand:
             break
@@ -167,10 +173,18 @@ def sequential_sml(y, X, site, off, R=200, seed=0, sig0=0.1):
         states[j] = 1
         beta[j] = theta[1 + pos]
         beta_se[j] = se[1 + pos]
+    const_sigma, const_sigma_se = 0.0, np.nan
     for t_idx, pos in enumerate(rand):
+        if pos == k:  # the constant
+            const_sigma, const_sigma_se = abs(theta[k + 1 + t_idx]), se[k + 1 + t_idx]
+            continue
         j = active[pos]
         states[j] = 2
         sigma[j] = abs(theta[k + 1 + t_idx])
         sigma_se[j] = se[k + 1 + t_idx]
-    return dict(states=states, beta=beta, sigma=sigma, beta_se=beta_se, sigma_se=sigma_se,
-                seconds=time.perf_counter() - t0, n_refits=n_refits)
+    out = dict(states=states, beta=beta, sigma=sigma, beta_se=beta_se, sigma_se=sigma_se,
+               seconds=time.perf_counter() - t0, n_refits=n_refits)
+    if rand_const:
+        out.update(const_sigma=const_sigma, const_sigma_se=const_sigma_se, alpha=theta[0],
+                   r=float(np.exp(theta[-1])), loglik=float(ll), theta=theta, rand=rand, active=active)
+    return out
