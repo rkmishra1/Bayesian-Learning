@@ -93,7 +93,7 @@ def figure(summ, methods, figdir: Path):
                 yv = np.array([sm.loc[T, col] for T in Ts])
                 ye = 1.96 * np.array([sm.loc[T, col + "_se"] for T in Ts])
                 ax.errorbar(x, yv, yerr=ye, fmt="none", ecolor=sty["color"], elinewidth=1.1, zorder=2)
-                ms = 6.6 if sty["marker"] in "^vP" else 5.6
+                ms = {"P": 8.0, "^": 6.6, "v": 6.6}.get(sty["marker"], 5.6)
                 ax.plot(x, yv, linestyle="none", marker=sty["marker"], markersize=ms, color=sty["color"],
                         markeredgecolor=A.SURFACE, markeredgewidth=1.4, label=sty["label"], zorder=3)
             ax.set_xticks(range(len(Ts)))
@@ -110,9 +110,9 @@ def figure(summ, methods, figdir: Path):
                 ax.set_ylabel(ylab.replace(" declared", "\ndeclared").replace("parameter ", "parameter\n"))
     h, lab = axes[0, 0].get_legend_handles_labels()
     nc = 2 if len(methods) == 4 else 3
-    fig.legend(h, lab, loc="upper center", ncol=nc, bbox_to_anchor=(0.5, 1.06 if len(methods) > 3 else 1.035),
+    fig.tight_layout(rect=(0, 0, 1, 0.90 if len(methods) > 3 else 0.95))
+    fig.legend(h, lab, loc="lower center", ncol=nc, bbox_to_anchor=(0.5, 0.905 if len(methods) > 3 else 0.95),
                handletextpad=0.3, columnspacing=1.4)
-    fig.tight_layout(rect=(0, 0, 1, 0.93 if len(methods) > 3 else 0.95))
     A._save(fig, figdir, "dgpBC_spurious")
 
 
@@ -124,10 +124,9 @@ def table(summ, methods, tabdir: Path):
             for T in (1, 5):
                 x = summ[(summ.dgp == dgp) & (summ["T"] == T) & (summ.method == m)]
                 vals.append(f"{x.target_R.iloc[0]:.2f} & {x.any_R.iloc[0]:.2f}" if len(x) else "-- & --")
-        lab = A.METHODS[m]["label"].replace(" ", "\\\\ ", 1)
-        L.append(f"\\shortstack[l]{{{lab}}} & " + " & ".join(vals) + " \\\\")
+        L.append(f"{m} & " + " & ".join(vals) + " \\\\")
     tabdir.mkdir(parents=True, exist_ok=True)
-    (tabdir / "dgpBC_spurious_rows.tex").write_text("\n\\addlinespace\n".join(L) + "\n")
+    (tabdir / "dgpBC_spurious_rows.tex").write_text("\n".join(L) + "\n")
 
 
 def main():

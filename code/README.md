@@ -60,7 +60,8 @@ python scripts/run_m6.py --dgp C --reps 100 --jobs 4 --cells 2,3 --out results/d
 Seeds are derived from the DGP, cell and replication index, so reruns reproduce the
 stored results, and every driver skips replications that already have a result file.
 With 4 cores the DGP-A run takes about 1.5 hours, M2/M3 about 2.5 hours (M2 needs about
-ten Bayesian fits per data set), and DGP-B and DGP-C about 75 minutes each.
+ten Bayesian fits per data set), and DGP-B and DGP-C about 75 minutes each. M6 takes
+about one hour for DGP-A and 45 minutes each for DGP-B and DGP-C.
 
 ## Settings used
 

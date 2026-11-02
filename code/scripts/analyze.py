@@ -210,7 +210,7 @@ def fig_detection(summ: pd.DataFrame, figdir: Path):
             yv = np.array([sub.loc[tuple(d), col] for d in designs])
             ye = np.array([sub.loc[tuple(d), col + "_se"] for d in designs]) * 1.96
             ax.errorbar(x, yv, yerr=ye, fmt="none", ecolor=sty["color"], elinewidth=1.1, capsize=0, alpha=0.9, zorder=2)
-            ms = 6.6 if sty["marker"] in "^vP" else 5.6  # triangles and plus read smaller at equal size
+            ms = {"P": 8.0, "^": 6.6, "v": 6.6}.get(sty["marker"], 5.6)  # triangles and plus read smaller at equal size
             ax.plot(x, yv, linestyle="none", marker=sty["marker"], markersize=ms, color=sty["color"],
                     markeredgecolor=SURFACE, markeredgewidth=1.4, label=sty["label"], zorder=3)
         ax.set_title(title, color=INK)
