@@ -70,7 +70,7 @@ with the second argument a rate. The P\'olya-Gamma variables are integrated out 
   \item set $\gamma_j=1$ with probability $\dfrac{\pi_\beta\,\mathrm{BF}^{\beta}_j\,h_j(1)}{\pi_\beta\,\mathrm{BF}^{\beta}_j\,h_j(1)+(1-\pi_\beta)\,h_j(0)}$, where $h_j(g)=\Pr(\delta_j\mid\gamma_j=g)$ accounts for heredity (under strong heredity, $\delta_j=1$ forces $\gamma_j=1$)
   \item if $\gamma_j=1$ draw $\beta_j\sim\Normal\left(B_j/(S_j+\tau_\beta^{-2}),\ (S_j+\tau_\beta^{-2})^{-1}\right)$, otherwise set $\beta_j=0$.
   \end{enumerate}
-\item For each random-eligible $j$ in random order, update $(\delta_j,\sigma_j,z_{\cdot j})$:
+\item For each random-eligible $j$ in random order, including the random intercept ($j=0$, $x_{it0}=1$, $\pi_0=1/2$) when it is a candidate, update $(\delta_j,\sigma_j,z_{\cdot j})$:
   \begin{enumerate}[label=(\alph*),leftmargin=*]
   \item compute $q_{ij}$, $b_{ij}$ and $\mathrm{BF}^{\sigma}_j$ in \eqref{eq:bf-sigma} by one-dimensional quadrature of \eqref{eq:ell}
   \item set $\delta_j=1$ with probability $\dfrac{\pi_j\,\mathrm{BF}^{\sigma}_j}{\pi_j\,\mathrm{BF}^{\sigma}_j+1-\pi_j}$, where $\pi_j=\gamma_j\pi_{\sigma1}+(1-\gamma_j)\pi_{\sigma0}$

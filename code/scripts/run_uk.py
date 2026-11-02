@@ -35,7 +35,7 @@ from rpsel.sml import _SML, sequential_sml  # noqa: E402
 TRAIN, TEST = range(2015, 2019), [2019]
 
 
-def run_bayes(D, method, chain, n_iter, burn, out):
+def run_bayes(D, method, chain, n_iter, burn, out, tag="", overrides=None):
     tr, te = D["train"], D["test"]
     p = D["X"].shape[1]
     XX = D["X"] if method == "M4" else np.hstack([D["X"], D["Q"]])
@@ -43,16 +43,17 @@ def run_bayes(D, method, chain, n_iter, burn, out):
     W = D["X"] if method == "M6" else None
     ho = Holdout(XX[te], D["site"][te], D["off"][te], D["y"][te], W=None if W is None else W[te])
     cfg = SamplerConfig(n_iter=n_iter, burn=burn, seed=1000 * chain + {"M4": 4, "M5": 5, "M6": 6}[method],
-                        random_intercept=True, verbose=True)
+                        random_intercept=True, verbose=True, **(overrides or {}))
     trace = RPSelector(D["y"][tr], XX[tr], D["site"][tr], D["off"][tr], eligible=elig, config=cfg,
                        W=None if W is None else W[tr], on_keep=ho).run()
     pred, lpd, mean = ho.summary()
     keys = ["alpha", "beta", "sigma", "gamma", "delta", "pi_b", "pi_s1"] + (
         ["rho0", "rho", "eta", "pi_rho"] if method == "M6" else ["r"])
-    np.savez_compressed(out / f"{method}_c{chain}_trace.npz", **{k: trace[k] for k in keys})
-    np.save(out / f"{method}_c{chain}_lpd.npy", lpd)
+    np.savez_compressed(out / f"{method}{tag}_c{chain}_trace.npz", **{k: trace[k] for k in keys})
+    np.save(out / f"{method}{tag}_c{chain}_lpd.npy", lpd)
     Pm = state_probabilities(trace)
-    rec = dict(method=method, chain=chain, n_iter=n_iter, burn=burn, seconds=float(trace["seconds"]),
+    rec = dict(method=method + tag, chain=chain, n_iter=n_iter, burn=burn, seconds=float(trace["seconds"]),
+               overrides=overrides or {},
                names=D["names"], P=Pm.round(4).tolist(), states=decide_states(trace).tolist(),
                P_ri=float(trace["delta"][:, -1].mean()), predict=pred)
     if method == "M6":
@@ -114,10 +115,16 @@ def main():
     ap.add_argument("--R", type=int, default=200)
     ap.add_argument("--data", default="data/uk_links_2015_2019.csv.gz")
     ap.add_argument("--out", default="results/uk")
+    ap.add_argument("--tag", default="", help="suffix for sensitivity runs, e.g. _tau025")
+    ap.add_argument("--set", nargs="*", default=[], help="SamplerConfig overrides, e.g. tau_s=0.25 heredity=weak")
     a = ap.parse_args()
+    overrides = {}
+    for kv in a.set:
+        k, v = kv.split("=")
+        overrides[k] = v if k == "heredity" else float(v)
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    target = out / f"{a.method}_c{a.chain}.json"
+    target = out / f"{a.method}{a.tag}_c{a.chain}.json"
     if target.exists():
         print(f"{target} exists")
         return
@@ -126,7 +133,7 @@ def main():
     if a.method == "M1":
         rec = run_m1(D, a.R, seed=2015, out=out)
     else:
-        rec = run_bayes(D, a.method, a.chain, a.n_iter, a.burn, out)
+        rec = run_bayes(D, a.method, a.chain, a.n_iter, a.burn, out, tag=a.tag, overrides=overrides)
     rec["wall_seconds"] = time.time() - t0
     tmp = target.with_suffix(".tmp")
     tmp.write_text(json.dumps(rec))
