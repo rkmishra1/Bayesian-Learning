@@ -1,0 +1,7 @@
+iter 500: r=19.91 fixed=15 random=11 195.0s
+iter 1000: r=25.61 fixed=14 random=11 393.1s
+iter 1500: r=26.94 fixed=14 random=13 585.6s
+iter 2000: r=29.45 fixed=14 random=12 771.1s
+iter 2500: r=32.92 fixed=15 random=13 956.1s
+iter 3000: r=32.75 fixed=14 random=14 1151.7s
+{"lpd": -28113.767599107483, "lpd_mean": -1.640338852856496, "mae": 1.367454424369938, "rmse": 2.0368877889882224, "n": 17139} 1152s

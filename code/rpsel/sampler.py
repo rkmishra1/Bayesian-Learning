@@ -62,6 +62,11 @@ class SamplerConfig:
     # mean) and whose indicator delta has prior probability pi_ri, outside the beta-binomial.
     random_intercept: bool = False
     pi_ri: float = 0.5
+    # Translation moves (Liu and Sabatti, 2000) for every random parameter: shift the mean
+    # (beta_j, or alpha for the random intercept) by c and the site draws z_.j by -c/sigma_j.
+    # The likelihood is unchanged and c is drawn from its Gaussian conditional. They remove the
+    # slow trade-off between a mean and the average of its site draws when n is large.
+    shift_moves: bool = False
     seed: int | None = None
     verbose: bool = False
 
@@ -184,6 +189,30 @@ class RPSelector:
         else:
             t = (-f0 + np.sqrt(f0 * f0 + u * (f1 * f1 - f0 * f0))) / (f1 - f0)
         return grid[k] + t * dx[k]
+
+    def _shift_moves(self, alpha, beta, sigma, gam, dlt, Z, ri, tau_b2):
+        """Translation moves for every active random parameter (see SamplerConfig.shift_moves)."""
+        cfg, rng = self.cfg, self.rng
+        n = Z.shape[0]
+        for j in np.nonzero(dlt)[0]:
+            s = sigma[j]
+            if s == 0.0:
+                continue
+            if j == ri:
+                mean0, prec0 = alpha, 1.0 / cfg.s_alpha**2
+            elif gam[j]:
+                mean0, prec0 = beta[j], 1.0 / tau_b2
+            else:  # weak heredity: the mean is held at zero, no move
+                continue
+            zbar = Z[:, j].mean()
+            prec = n / (s * s) + prec0
+            c = (n * zbar / s - mean0 * prec0) / prec + rng.standard_normal() / np.sqrt(prec)
+            Z[:, j] -= c / s
+            if j == ri:
+                alpha = alpha + c
+            else:
+                beta[j] += c
+        return alpha
 
     # ------------------------------------------------------------------ dispersion block
     # The dispersion is bounded below, r_it = max(exp(rho0 + w'rho), r_floor). The bound is part
@@ -409,6 +438,8 @@ class RPSelector:
                     Z[:, j] = rng.standard_normal(n)
                 psi += s * xj * Z[site, j] - u_old
                 sigma[j], dlt[j] = s, d_new
+            if cfg.shift_moves:
+                alpha = self._shift_moves(alpha, beta, sigma, gam, dlt, Z, ri, tau_b2)
             # 6. hyperparameters
             kb = int((gam & cand).sum())
             pi_b = rng.beta(cfg.a_b + kb, cfg.b_b + n_cand - kb)
@@ -552,6 +583,8 @@ class RPSelector:
                 psi += s * xj * Z[site, j] - u_old
                 sigma[j], dlt[j] = s, d_new
 
+            if cfg.shift_moves:
+                alpha = self._shift_moves(alpha, beta, sigma, gam, dlt, Z, ri, tau_b2)
             # 6. hyperparameters
             kb = int((gam & cand).sum())
             pi_b = rng.beta(cfg.a_b + kb, cfg.b_b + n_cand - kb)

@@ -33,7 +33,56 @@ The offset is the logarithm of link length, and the logarithm of AADF is a candi
 The models are fitted to the four years 2015 to 2018 (68{,}556 link-years) and judged on the 2019 counts of the same links. The criterion is the log predictive density $\sum_i\log p(y_{i,2019}\mid\y_{\text{2015--18}})$, which conditions on everything the earlier years reveal about each link. For the proposed methods it is estimated by averaging the negative binomial probability of $y_{i,2019}$ over the posterior draws, including each link's draws $z_{ij}$. For M1 it averages over the Halton draws of each link, weighted by their likelihood for the link's 2015 to 2018 counts, which is the simulated posterior of the link's coefficients. Each proposed method is run as two chains of 3{,}000 iterations, of which the first 1{,}000 are discarded, with the default hyperparameters of Section~\ref{sec:prior}.
 
 \subsection{Results}
-\tbd{Results in preparation.}
+\tbd{Results text from the long runs.}
+
+\begin{table}[!htbp]
+\centering
+\begin{threeparttable}
+\caption{Prediction of the 2019 collision counts of the 17{,}139 links from models fitted to 2015 to 2018.}
+\label{tab:uk-predict}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcrrccr}
+\toprule
+Method & Random & LPD & $\Delta$LPD (SE) & MAE & RMSE & Minutes \\
+\midrule
+\tablerows{tables/uk_predict_rows.tex}
+\bottomrule
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item Random: number of covariates declared random (median probability rule for M4 to M6), and RI when the intercept is random. LPD: log predictive density of the 2019 counts, $\sum_i\log p(y_{i,2019}\mid\y_{\text{2015--18}})$, higher is better. $\Delta$LPD: difference from the best method, with the standard error of the sum of link-level differences. MAE and RMSE: mean absolute and root mean squared error of the predictive mean. Minutes: run time of one chain or of the full M1 procedure on one core. M1: sequential simulated maximum likelihood with a random constant. M4, M5 and M6: proposed method with a linear mean, a flexible mean, and a flexible mean with dispersion selection, each with a random intercept candidate.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/uk_state_probabilities}
+\caption{Specification of the British major-road model. (a) Posterior probability that a candidate is included, fixed or random. (b) Posterior probability that it is random. (c) Posterior probability that it affects the dispersion, under M6. Markers are pooled over chains, and a line spans the chain-specific values where they differ. For M1 the open diamond marks whether the candidate was selected (1) or not (0).}
+\label{fig:uk-states}
+\end{figure}
+
+\begin{table}[!htbp]
+\centering
+\begin{threeparttable}
+\caption{Model-averaged estimates from M6 for the British major-road links, 2015 to 2018. Continuous candidates are standardized, so coefficients are per standard deviation.}
+\label{tab:uk-estimates}
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{@{}lrcccccccc@{}}
+\toprule
+ & \multicolumn{2}{c}{Mean effect $\beta_j$} & & \multicolumn{2}{c}{Heterogeneity $|\sigma_j|$} & & & \multicolumn{2}{c}{Dispersion $\rho_k$} \\
+\cmidrule(lr){2-3}\cmidrule(lr){5-6}\cmidrule(lr){9-10}
+Candidate & Mean & 95\% interval & $P_j(\mathrm{R})$ & Mean & 95\% interval & Positive & $P_k(\mathrm{D})$ & Mean & 95\% interval \\
+\midrule
+\tablerows{tables/uk_estimates_rows.tex}
+\bottomrule
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item $\beta_j$: posterior mean and 95\% interval, averaged over specifications (zero when excluded). $|\sigma_j|$ and Positive (the share of links with a positive coefficient, $\Phi(\beta_j/|\sigma_j|)$) are given when $P_j(\mathrm{R})\ge0.5$, conditional on the parameter being random. $P_k(\mathrm{D})$: posterior probability of a dispersion effect, $\Pr(\eta_k=1\mid\y)$. $\rho_k$ is given when $P_k(\mathrm{D})\ge0.5$, conditional on inclusion. The dispersion is $r_{it}=\exp(\rho_0+\bm w_{it}^\top\bm\rho)$, so a positive $\rho_k$ means less overdispersion.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
 
 \subsection{Sensitivity}
 \tbd{Results under $(a_\sigma,b_\sigma)\in\{(1,1),(1,4)\}$, $\tau_\sigma\in\{0.25,0.5,1\}$, and strong versus weak heredity.}

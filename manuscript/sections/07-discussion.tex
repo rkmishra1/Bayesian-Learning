@@ -16,7 +16,7 @@ is no longer linear in $\bm\theta_j$ and requires a Metropolis step, but the sel
 
 \paragraph{Other outcomes} Injury severity models with random parameters are logit or ordered models. P\'olya-Gamma augmentation applies directly to binary and multinomial logit likelihoods \citep{polson2013bayesian}, so the three-state prior and the collapsed update carry over.
 
-\paragraph{Scale} For very large networks, the expectation-maximization approach to spike-and-slab selection \citep{rockova2014emvs, rockova2018spike} can locate high-posterior specifications quickly, with the sampler used to quantify uncertainty around them.
+\paragraph{Scale} With many sites the sampler mixes slowly in two directions. The mean of a random parameter trades off against the average of its site draws, which a translation move \citep{liu2000generalised} removes: it shifts $\beta_j$ by $c$ and every $z_{ij}$ by $-c/\sigma_j$, leaves the likelihood unchanged, and draws $c$ from its Gaussian conditional. Our implementation offers it as an option, and in a test with 2{,}000 simulated sites it doubled the effective sample size of the intercept. The second direction, the split of extra variation between the negative binomial dispersion and the random parameters, is not affected by that move and governs the run lengths needed in the application. For very large networks, the expectation-maximization approach to spike-and-slab selection \citep{rockova2014emvs, rockova2018spike} can locate high-posterior specifications quickly, with the sampler used to quantify uncertainty around them.
 
 \subsection{Limitations}
 

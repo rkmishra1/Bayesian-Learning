@@ -1,0 +1,7 @@
+iter 500: rho0=3.13 disp=6 fixed=22 random=9 283.8s
+iter 1000: rho0=3.36 disp=3 fixed=22 random=10 558.6s
+iter 1500: rho0=3.26 disp=2 fixed=20 random=12 828.5s
+iter 2000: rho0=3.45 disp=6 fixed=21 random=11 1098.0s
+iter 2500: rho0=3.20 disp=10 fixed=21 random=11 1448.4s
+iter 3000: rho0=3.30 disp=8 fixed=22 random=10 1760.7s
+{"lpd": -28046.297519718122, "lpd_mean": -1.6364022124813655, "mae": 1.3544011365813833, "rmse": 2.0228867612337993, "n": 17139} 1761s

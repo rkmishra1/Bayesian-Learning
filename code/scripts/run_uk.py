@@ -114,7 +114,7 @@ def main():
     ap.add_argument("--burn", type=int, default=1000)
     ap.add_argument("--R", type=int, default=200)
     ap.add_argument("--data", default="data/uk_links_2015_2019.csv.gz")
-    ap.add_argument("--out", default="results/uk")
+    ap.add_argument("--out", default="results/uk_long")
     ap.add_argument("--tag", default="", help="suffix for sensitivity runs, e.g. _tau025")
     ap.add_argument("--set", nargs="*", default=[], help="SamplerConfig overrides, e.g. tau_s=0.25 heredity=weak")
     a = ap.parse_args()

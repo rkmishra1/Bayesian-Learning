@@ -23,6 +23,11 @@ from matplotlib.lines import Line2D  # noqa: E402
 from rpsel.application import BINARY, CONTINUOUS, LABELS, NAMES, P_CONT  # noqa: E402
 
 BAYES = ["M4", "M5", "M6"]
+SHORT = {"log_aadf": "log AADF", "hgv_share": "HGV share", "lgv_share": "LGV share", "bus_share": "Bus/coach share",
+         "mc_share": "Motorcycle share", "log_cycles": "log(1+cycles)", "log_length": "log length",
+         "curvature": "Curvature", "node_degree": "Junction degree", "road_density": "Road density",
+         "motorway": "Motorway", "trunk_a": "Trunk A road", "london": "London", "scotland": "Scotland",
+         "wales": "Wales"}
 GROUPS = [("Traffic (varies by year)", NAMES[:6]), ("Link geometry and network", NAMES[6:10]),
           ("Road class and country", NAMES[10:])]
 
@@ -77,6 +82,23 @@ def pooled(recs, m):
     return out
 
 
+def chain_values(recs, m, key, c):
+    """Per-chain value of the quantity shown in panel c for candidate key."""
+    out = []
+    for k in sorted(recs):
+        if k[0] != m:
+            continue
+        r = recs[k]
+        if key == "ri":
+            out.append(r["P_ri"])
+        elif c == 2:
+            out.append(r["P_disp"][key])
+        else:
+            P = np.array(r["P"])
+            out.append(P[key, 1] + P[key, 2] if c == 0 else P[key, 2])
+    return out
+
+
 def figure_states(recs, figdir: Path):
     p = len(NAMES)
     have = [m for m in BAYES if any(k[0] == m for k in recs)]
@@ -89,9 +111,8 @@ def figure_states(recs, figdir: Path):
     rows.append(("Site level", None))
     rows.append(("Random intercept", "ri"))
     ypos = np.arange(len(rows))[::-1]
-    fig, axes = plt.subplots(1, 3, figsize=(7.0, 4.9), sharey=True,
-                             gridspec_kw=dict(width_ratios=[1, 1, 1], wspace=0.08))
-    titles = ["(a) Included, fixed or random", "(b) Random parameter", "(c) Dispersion effect (M6)"]
+    fig, axes = plt.subplots(1, 3, figsize=(7.0, 5.2), sharey=True)
+    titles = ["(a) Included", "(b) Random", "(c) Dispersion effect, M6"]
     offs = dict(zip(["M1"] + have, np.linspace(0.27, -0.27, len(have) + 1)))
     for c, ax in enumerate(axes):
         for (lab, key), y0 in zip(rows, ypos):
@@ -126,6 +147,11 @@ def figure_states(recs, figdir: Path):
                         v = (P[key, 1] + P[key, 2]) if c == 0 else (P[key, 2] if c == 1 else pool[m]["P_disp"][key])
                 xs.append(v)
                 ys.append(y0 + (0 if c == 2 else offs[m]))
+                if m != "M1":
+                    cv = chain_values(recs, m, key, c)
+                    if len(cv) > 1 and max(cv) - min(cv) > 0.02:
+                        ax.plot([min(cv), max(cv)], [ys[-1]] * 2, color=sty["color"], lw=1.0, alpha=0.75,
+                                solid_capstyle="butt", zorder=2)
             if not xs:
                 continue
             filled = m != "M1"
@@ -148,16 +174,16 @@ def figure_states(recs, figdir: Path):
             t.set_fontweight("semibold")
             t.set_color(A.INK)
     axes[0].set_ylim(-0.7, len(rows) - 0.3)
-    fig.supxlabel("Posterior probability (Bayesian methods) or selection (M1, open diamond)", fontsize=8,
-                  color=A.INK2, y=0.01)
+    fig.supxlabel("Posterior probability, pooled over chains (a line spans the chain values where they differ). "
+                  "M1: selected (1) or not (0).", fontsize=7.5, color=A.INK2, x=0.61, y=0.01)
     handles = [Line2D([], [], linestyle="none", marker="D", markersize=5, markerfacecolor="none",
                       markeredgecolor=A.METHODS["M1"]["color"], markeredgewidth=1.3, label=A.METHODS["M1"]["label"])]
     handles += [Line2D([], [], linestyle="none", marker=A.METHODS[m]["marker"],
                        markersize={"P": 7.5}.get(A.METHODS[m]["marker"], 5.4), color=A.METHODS[m]["color"],
                        markeredgecolor=A.SURFACE, markeredgewidth=0.9, label=A.METHODS[m]["label"]) for m in have]
-    fig.legend(handles=handles, loc="lower center", ncol=2, bbox_to_anchor=(0.55, 0.905),
-               handletextpad=0.3, columnspacing=1.4)
-    fig.tight_layout(rect=(0, 0.02, 1, 0.9))
+    fig.subplots_adjust(left=0.24, right=0.98, top=0.86, bottom=0.09, wspace=0.08)
+    fig.legend(handles=handles, loc="lower center", ncol=2, bbox_to_anchor=(0.61, 0.895),
+               handletextpad=0.3, columnspacing=1.6)
     A._save(fig, figdir, "uk_state_probabilities")
 
 
@@ -174,38 +200,36 @@ def trace_summaries(res: Path, m: str):
     return out
 
 
-def table_estimates(recs, res: Path, tabdir: Path):
-    """M6 (model-averaged) next to M1, for every candidate and the intercept heterogeneity."""
-    t = trace_summaries(res, "M6")
-    m1 = recs[("M1", 1)]
+def table_estimates(res: Path, tabdir: Path, m: str = "M6"):
+    """Model-averaged estimates from the final method: mean, heterogeneity and dispersion effects."""
+    from scipy.stats import norm
+    t = trace_summaries(res, m)
     p = len(NAMES)
     L = []
 
-    def ci(x):
+    def ci(x, d=2):
         lo, hi = np.quantile(x, [0.025, 0.975])
-        return f"{fmt(x.mean())} [{fmt(lo)}, {fmt(hi)}]"
+        return f"{fmt(x.mean(), d)} & [{fmt(lo, d)},{fmt(hi, d)}]"
 
     for g, names in GROUPS:
-        L.append(f"\\multicolumn{{7}}{{l}}{{\\emph{{{g}}}}} \\\\")
+        L.append(f"\\multicolumn{{10}}{{l}}{{\\emph{{{g}}}}} \\\\")
         for n in names:
             j = NAMES.index(n)
             b = ci(t["beta"][:, j])
-            pr = t["dlt"][:, j].mean()
-            s = ci(t["sig"][:, j][t["dlt"][:, j]]) if pr >= 0.05 else "--"
-            pd_ = t["eta"][:, j].mean()
-            rho = ci(t["rho"][:, j][t["eta"][:, j]]) if pd_ >= 0.05 else "--"
-            st = m1["states"][j]
-            if st == 0:
-                m1b, m1s = "--", "--"
+            on = t["dlt"][:, j]
+            pr = on.mean()
+            if pr >= 0.5:
+                s_ = ci(t["sig"][on, j])
+                pos = fmt(norm.cdf(t["beta"][on, j] / t["sig"][on, j]).mean())
             else:
-                m1b = f"{fmt(m1['beta'][j])} ({fmt(m1['beta_se'][j])})"
-                m1s = f"{fmt(m1['sigma'][j])} ({fmt(m1['sigma_se'][j])})" if st == 2 else "--"
-            L.append(f"\\quad {LABELS[j]} & {b} & {fmt(pr)} & {s} & {fmt(pd_)} & {m1b} & {m1s} \\\\")
-    pr0 = t["dlt"][:, p].mean()
-    s0 = ci(t["sig"][:, p][t["dlt"][:, p]]) if pr0 >= 0.05 else "--"
-    m1s0 = f"{fmt(m1['const_sigma'])} ({fmt(m1['const_sigma_se'])})" if m1["const_sigma"] > 0 else "--"
+                s_, pos = "\\multicolumn{2}{c}{--}", "--"
+            pd_ = t["eta"][:, j].mean()
+            rho = ci(t["rho"][t["eta"][:, j], j]) if pd_ >= 0.5 else "\\multicolumn{2}{c}{--}"
+            L.append(f"\\quad {SHORT[n]} & {b} & {fmt(pr)} & {s_} & {pos} & {fmt(pd_)} & {rho} \\\\")
+    on = t["dlt"][:, -1]  # the random intercept is the last column
     L.append("\\addlinespace")
-    L.append(f"Random intercept & -- & {fmt(pr0)} & {s0} & -- & -- & {m1s0} \\\\")
+    s0 = ci(t["sig"][on, -1]) if on.mean() >= 0.5 else "\\multicolumn{2}{c}{--}"
+    L.append(f"Random intercept & \\multicolumn{{2}}{{c}}{{--}} & {fmt(on.mean())} & {s0} & -- & -- & \\multicolumn{{2}}{{c}}{{--}} \\\\")
     (tabdir / "uk_estimates_rows.tex").write_text("\n".join(L) + "\n")
 
 
@@ -236,15 +260,64 @@ def table_predict(recs, res: Path, tabdir: Path):
                    ri=bool(ri), minutes=sec)
         rows.append(row)
         dtxt = "0" if m == best else f"{fmt(d.sum(), 1)} ({se:.1f})"
-        L.append(f"{A.METHODS[m]['label']} & {n_rand}{' + RI' if ri else ''} & {lpd[m].sum():,.1f} & {dtxt} & "
+        L.append(f"{m} & {n_rand}{' + RI' if ri else ''} & {lpd[m].sum():,.1f} & {dtxt} & "
                  f"{mae:.3f} & {rmse:.3f} & {sec:.0f} \\\\".replace(",", "{,}").replace("-", "$-$"))
     (tabdir / "uk_predict_rows.tex").write_text("\n".join(L) + "\n")
     return pd.DataFrame(rows)
 
 
+def _split_rhat_ess(chains):
+    """Split-chain R-hat and a simple effective sample size (initial positive sequence) for
+    a list of 1-D chains of equal length."""
+    halves = []
+    for c in chains:
+        h = len(c) // 2
+        halves += [c[:h], c[h:2 * h]]
+    x = np.array(halves)
+    m, n = x.shape
+    W = x.var(axis=1, ddof=1).mean()
+    B = n * x.mean(axis=1).var(ddof=1)
+    var = (n - 1) / n * W + B / n
+    rhat = float(np.sqrt(var / W)) if W > 0 else np.nan
+    # ESS from the average autocorrelation across halves
+    xc = x - x.mean(axis=1, keepdims=True)
+    f = np.fft.rfft(xc, n=2 * n, axis=1)
+    ac = np.fft.irfft(f * np.conj(f), axis=1)[:, :n].mean(axis=0)
+    ac = ac / ac[0] if ac[0] > 0 else ac
+    rho = 1 - (W - ac * W) / var if var > 0 else ac
+    s_, t = 0.0, 1
+    while t + 1 < n and rho[t] + rho[t + 1] > 0:
+        s_ += rho[t] + rho[t + 1]
+        t += 2
+    ess = float(m * n / (1 + 2 * s_))
+    return rhat, ess
+
+
+def diagnostics(res: Path, m: str):
+    files = sorted(res.glob(f"{m}_c*_trace.npz"))
+    if len(files) < 2:
+        return None
+    tr = [np.load(f) for f in files]
+    out = {}
+    out["alpha"] = _split_rhat_ess([t["alpha"] for t in tr])
+    if "rho0" in tr[0].files:
+        out["rho0"] = _split_rhat_ess([t["rho0"] for t in tr])
+    else:
+        out["r"] = _split_rhat_ess([t["r"] for t in tr])
+    out["sigma_RI"] = _split_rhat_ess([np.abs(t["sigma"][:, -1]) for t in tr])
+    p = len(NAMES)
+    for j in range(p):
+        if min(t["gamma"][:, j].mean() for t in tr) > 0.99:
+            out[f"beta_{NAMES[j]}"] = _split_rhat_ess([t["beta"][:, j] for t in tr])
+        if min(t["delta"][:, j].mean() for t in tr) > 0.99:
+            out[f"sigma_{NAMES[j]}"] = _split_rhat_ess([np.abs(t["sigma"][:, j]) for t in tr])
+    out["n_random"] = _split_rhat_ess([t["delta"][:, :p].sum(axis=1).astype(float) for t in tr])
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--res", default="results/uk")
+    ap.add_argument("--res", default="results/uk_long")
     ap.add_argument("--data", default="data/uk_links_2015_2019.csv.gz")
     ap.add_argument("--fig", default="../manuscript/figures")
     ap.add_argument("--tab", default="../manuscript/tables")
@@ -268,12 +341,22 @@ def main():
                 print("   P(disp):", dict(zip(NAMES, po["P_disp"].round(2))))
             if m in ("M5", "M6"):
                 print("   squares:", {k: round(v, 2) for k, v in squares_selected(res, m).items()})
+    for m in BAYES:
+        dg = diagnostics(res, m)
+        if dg:
+            rh = np.array([v[0] for v in dg.values()])
+            es = np.array([v[1] for v in dg.values()])
+            print(f"{m} diagnostics: {len(dg)} quantities, max R-hat {np.nanmax(rh):.3f}, min ESS {np.nanmin(es):.0f}")
+            for k, (r_, e_) in dg.items():
+                if r_ > 1.05 or e_ < 100:
+                    print(f"   {k}: R-hat {r_:.3f}, ESS {e_:.0f}")
+            pd.DataFrame(dg, index=["rhat", "ess"]).T.to_csv(res / f"{m}_diagnostics.csv")
     if ("M1", 1) in recs:
         m1 = recs[("M1", 1)]
         print("M1 states", dict(zip(NAMES, m1["states"])), "const sigma", round(m1["const_sigma"], 3))
     figure_states(recs, figdir)
-    if ("M1", 1) in recs and any(k[0] == "M6" for k in recs):
-        table_estimates(recs, res, tabdir)
+    if any(k[0] == "M6" for k in recs):
+        table_estimates(res, tabdir)
     pr = table_predict(recs, res, tabdir)
     print(pr.round(3).to_string(index=False))
     pr.to_csv(res / "predict_summary.csv", index=False)
