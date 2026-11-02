@@ -23,7 +23,10 @@ Conditional on the random components, $y_{it}$ and $y_{is}$ are independent with
 \section{Derivation of the conditional updates}\label{app:derivations}
 
 \paragraph{Proposition~\ref{prop:marginal}}
-Given the P\'olya-Gamma variables, the working log likelihood is $-\frac12\sum_{i,t}\omega_{it}(\tilde y_{it}-\psi_{it})^2$ up to a constant. Isolating the contribution of $\sigma_jx_{itj}z_{ij}$, the terms that involve $z_{ij}$ for site $i$ are
+Given the P\'olya-Gamma variables, the working log likelihood is, up to a constant,
+\[
+-\tfrac12\textstyle\sum_{i,t}\omega_{it}(\tilde y_{it}-\psi_{it})^2.
+\] Isolating the contribution of $\sigma_jx_{itj}z_{ij}$, the terms that involve $z_{ij}$ for site $i$ are
 \[
 -\tfrac12\sum_{t}\omega_{it}\left(e_{it}-\sigma x_{itj}z_{ij}\right)^2
 =-\tfrac12\sum_t\omega_{it}e_{it}^2+\sigma z_{ij}b_{ij}-\tfrac12\sigma^2z_{ij}^2q_{ij}.

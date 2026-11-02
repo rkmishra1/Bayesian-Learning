@@ -14,6 +14,7 @@
 \usepackage[colorlinks=true,citecolor=blue!60!black,linkcolor=blue!60!black,urlcolor=blue!60!black]{hyperref}
 \usepackage{lineno}
 \usepackage{setspace}
+\setlength{\emergencystretch}{1.5em} % fewer overfull lines with long inline formulas
 \usepackage[textsize=footnotesize,color=orange!25]{todonotes}
 
 \linenumbers
@@ -77,6 +78,8 @@ Crash frequency \sep Random parameters \sep Unobserved heterogeneity \sep Bayesi
 
 \end{frontmatter}
 
+% Title page on its own: with line numbers, a footnote on the first text page would overlap the preprint footer.
+\clearpage
 \onehalfspacing
 
 \input{sections/01-introduction}
