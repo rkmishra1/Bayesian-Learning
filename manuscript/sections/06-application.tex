@@ -42,7 +42,7 @@ The models are fitted to the four years 2015 to 2018 (68{,}556 link-years) and j
 
 The two mechanisms of Section~\ref{sec:identification} are visible in the data. Pedal cycles have a random parameter with probability $1.00$ under the linear mean of M4, but only $0.45$ under M5 and $0.31$ under M6, both of which select the squared term of pedal cycles with probability one. Road density behaves in the same way ($0.32$, $0.16$ and $0.09$). These are the spurious random parameters of omitted curvature seen in DGP-B. London is random with probability $1.00$ under M4, $0.87$ under M5 and $0.82$ under M6, which gives London a dispersion effect with probability one: collision counts on London links are less overdispersed than elsewhere, and a model with a common dispersion attributes part of that difference to heterogeneity in the London effect, as in DGP-C. The reverse also occurs. The logarithm of AADF is random with probability $0.47$ under M4 and $1.00$ once its curvature is modeled, so a linear specification can hide heterogeneity as well as create it.
 
-\paragraph{Effects} Table~\ref{tab:uk-estimates} gives the estimates of M6. The coefficient of log AADF, $0.62$ per standard deviation of $0.92$, is an elasticity of $0.68$ at average traffic, and its squared term is negative, so the elasticity falls as traffic grows. The elasticity varies across links (standard deviation $0.16$ per standard deviation of log AADF) but is positive on all of them. Link length enters with a coefficient of $-0.35$ per standard deviation in addition to the offset, so collisions grow less than proportionally with length, as expected for links that are bounded by junctions. Motorways and trunk A roads have fewer collisions than principal A roads with the same traffic, with substantial heterogeneity among motorway links ($|\sigma_j|=0.37$). For light goods vehicles the mean effect is close to zero but its sign varies, positive on 44\% of links, the kind of effect that strong heredity admits only because the mean is not exactly zero. Of the dispersion effects, the clearest is that of link length, $\rho=0.46$ per standard deviation: longer links are less overdispersed relative to their mean, which agrees with the argument of \citet{hauer2001overdispersion} that the overdispersion parameter of road-section models should depend on section length. M6 estimates $r=\exp(\rho_0)\approx26$ at average covariate values, against $r=36$ for M1, whose random parameters absorb more of the variation.
+\paragraph{Effects} Table~\ref{tab:uk-estimates} gives the estimates of M6. The coefficient of log AADF, $0.62$ per standard deviation of $0.92$, is an elasticity of $0.68$ at average traffic, and its squared term is negative, so the elasticity falls as traffic grows. The elasticity varies across links (standard deviation $0.16$ per standard deviation of log AADF) but is positive on all of them. Link length enters with a coefficient of $-0.35$ per standard deviation in addition to the offset, so collisions grow less than proportionally with length, as expected for links that are bounded by junctions. Motorways and trunk A roads have fewer collisions than principal A roads with the same traffic, with substantial heterogeneity among motorway links ($|\sigma_j|=0.37$). For light goods vehicles the mean effect is close to zero but its sign varies, positive on 44\% of links, the kind of effect that strong heredity admits only because the mean is not exactly zero. M6 gives four candidates a dispersion effect: the bus and coach share, link length, London and Scotland. The clearest is that of link length, $\rho=0.46$ per standard deviation: longer links are less overdispersed relative to their mean, which agrees with the argument of \citet{hauer2001overdispersion} that the overdispersion parameter of road-section models should depend on section length. M6 estimates $r=\exp(\rho_0)\approx26$ at average covariate values, against $r=36$ for M1, whose random parameters absorb more of the variation.
 
 \begin{table}[!htbp]
 \centering
@@ -93,5 +93,26 @@ Candidate & Mean & 95\% interval & $P_j(\mathrm{R})$ & Mean & 95\% interval & Po
 \end{threeparttable}
 \end{table}
 
-\subsection{Sensitivity}
-\tbd{Results under $(a_\sigma,b_\sigma)\in\{(1,1),(1,4)\}$, $\tau_\sigma\in\{0.25,0.5,1\}$, and strong versus weak heredity.}
+\subsection{Sensitivity}\label{sec:app-sens}
+
+Table~\ref{tab:uk-sens} repeats M6 under four other priors. The random intercept and six random parameters, on log AADF, the share of light goods vehicles, link length, curvature, motorway and Scotland, have posterior probability $1.00$ to two decimals in every setting, and the same four candidates have dispersion effects in every setting. The settings differ for parameters with small standard deviations. A wider slab, $\tau_\sigma=1$, declares seven covariates random instead of nine and drops the bus and coach share and London, whose standard deviations are $0.08$ and $0.18$ under the default. A wider slab spreads the prior over larger values and so penalizes a small standard deviation more, the familiar dependence of Bayes factors on the slab scale. A narrower slab brings the share of heavy goods vehicles and Wales to $0.49$ and $0.50$, and weak heredity brings the former to $0.50$. A prior expecting fewer random parameters, $b_\sigma=4$, makes the same nine selections, because with 17{,}139 links the data outweigh the beta-binomial prior. The log predictive density varies by 10 across the five settings, less than the difference between M5 and M6, and every setting predicts better than M1, M4 and M5.
+
+\begin{table}[!htbp]
+\centering
+\begin{threeparttable}
+\caption{Sensitivity of M6 to the prior: posterior probability that each candidate is random, the number of covariates declared random, the number of candidates with a dispersion effect, and the log predictive density (LPD) of the 2019 counts.}
+\label{tab:uk-sens}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccccc}
+\toprule
+\tablerows{tables/uk_sensitivity_head.tex}
+\midrule
+\tablerows{tables/uk_sensitivity_rows.tex}
+\bottomrule
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item Dispersion effects: number of candidates with $P_k(\mathrm{D})>0.5$, in every setting the bus and coach share, link length, London and Scotland. Default: $\tau_\sigma=0.5$, $(a_\sigma,b_\sigma)=(1,1)$ and strong heredity, pooled over two chains of 8{,}000 iterations. The other columns change one setting and are single chains of 6{,}000 iterations with 3{,}000 discarded. $b_\sigma=4$: $\pi_{\sigma1}\sim\Betad(1,4)$, a prior mean of $0.2$ for the share of included covariates that are random. Weak: weak heredity with $\pi_{\sigma0}\sim\Betad(1,9)$.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}

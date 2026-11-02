@@ -1,7 +1,8 @@
 # Code: Bayesian selection of fixed and random parameters
 
 Python implementation of the three-state sampler in the manuscript (`../manuscript`), the
-conventional sequential baseline, and the simulation study.
+conventional sequential baseline, the simulation study and the application to British
+major-road links.
 
 ## Install
 
@@ -25,6 +26,10 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 | `scripts/run_m6.py` | Driver for M6: squared candidates plus selection of dispersion covariates, log r = rho0 + x'rho |
 | `scripts/check_formulas.py` | Monte Carlo and quadrature checks of Propositions 1 to 3 and the Bayes factors |
 | `results/dgpA/` | Raw replications, summary CSVs and the run log for DGP-A |
+| `scripts/build_uk_data.py`, `data/` | Builds the British major-road panel from public DfT data (see `data/README.md`) |
+| `rpsel/application.py` | Application design matrix and hold-out predictive density |
+| `scripts/run_uk.py`, `scripts/analyze_uk.py` | Application driver (one method and chain per call) and its tables, figure and diagnostics |
+| `results/uk_long/` | Application results reported in Section 6 (8,000 sweeps). `results/uk_pilot/` holds the 3,000-sweep pilot runs |
 
 ## Reproduce DGP-A
 
@@ -63,6 +68,25 @@ With 4 cores the DGP-A run takes about 1.5 hours, M2/M3 about 2.5 hours (M2 need
 ten Bayesian fits per data set), and DGP-B and DGP-C about 75 minutes each. M6 takes
 about one hour for DGP-A and 45 minutes each for DGP-B and DGP-C.
 
+## Reproduce the application
+
+Download the three DfT files listed in `data/README.md` into a folder of their own, then
+
+```bash
+python scripts/build_uk_data.py --collisions RAW/dft-road-casualty-statistics-collision-1979-latest-published-year.csv \
+    --aadf RAW/dft_traffic_counts_aadf.csv --mrdb RAW/MRDB_2019_published.shp --out data/uk_links_2015_2019.csv.gz
+python scripts/run_uk.py --method M6 --chain 1 --n_iter 8000 --burn 4000
+python scripts/run_uk.py --method M6 --chain 2 --n_iter 8000 --burn 4000
+python scripts/run_uk.py --method M4 --chain 1 --n_iter 8000 --burn 4000
+python scripts/run_uk.py --method M5 --chain 1 --n_iter 8000 --burn 4000
+python scripts/run_uk.py --method M1
+python scripts/analyze_uk.py --fig ../manuscript/figures --tab ../manuscript/tables
+```
+
+Each M6 chain takes about 85 minutes on one core, M4 and M5 about 65 and M1 about 26.
+Sensitivity runs use `--tag` and `--set`, for example
+`--tag _tau025 --set tau_s=0.25 --n_iter 6000 --burn 3000`.
+
 ## Settings used
 
 * Sampler: 3,000 iterations, 1,000 burn-in, one chain, strong heredity, slab scales fixed
@@ -94,3 +118,13 @@ about one hour for DGP-A and 45 minutes each for DGP-B and DGP-C.
    mu + 100 mu^2) removed the failures. It was reached in 49% of the n = 300, T = 1 DGP-A
    replications (median 4 of 3,000 sweeps), in 2% at n = 1000, T = 1, and never in the panel
    designs or in DGP-C, whose results are identical with and without the bound.
+4. **Random intercept and centering in the application.** In panel data a random slope on
+   a covariate far from zero can mimic a site effect, so the application adds a random
+   intercept candidate (`random_intercept=True`, prior inclusion 1/2) and centers the
+   continuous covariates. The option is off in the simulations, which reproduce exactly.
+5. **Run length in the application.** With 17,139 links, 3,000-sweep pilot chains of M6
+   disagreed on four candidates. The reported runs use 8,000 sweeps with 4,000 burn-in,
+   after which two M6 chains agree on every state. Optional translation moves
+   (`shift_moves=True`) shift a mean and its site draws together, leave the posterior
+   unchanged and doubled the effective sample size of the intercept in a test, but were not
+   used in the reported runs.

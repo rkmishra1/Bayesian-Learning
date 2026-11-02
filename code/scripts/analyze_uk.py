@@ -266,6 +266,40 @@ def table_predict(recs, res: Path, tabdir: Path):
     return pd.DataFrame(rows)
 
 
+SENS = [("M6", "Default"), ("M6_tau025", "$\\tau_\\sigma=0.25$"), ("M6_tau100", "$\\tau_\\sigma=1$"),
+        ("M6_bs4", "$b_\\sigma=4$"), ("M6_weak", "Weak")]
+
+
+def table_sensitivity(recs, res: Path, tabdir: Path):
+    have = [(m, lab) for m, lab in SENS if any(k[0] == m for k in recs)]
+    if len(have) < 2:
+        return None
+    P, Pd, lpd, nr = {}, {}, {}, {}
+    for m, _ in have:
+        ch = [recs[k] for k in sorted(recs) if k[0] == m]
+        P[m] = np.mean([np.array(c["P"])[:, 2] for c in ch], axis=0)
+        Pd[m] = np.mean([np.array(c["P_disp"]) for c in ch], axis=0)
+        P[m] = np.r_[P[m][:len(NAMES)], np.mean([c["P_ri"] for c in ch])]
+        lpd[m] = np.mean([c["predict"]["lpd"] for c in ch])
+        nr[m] = int((P[m][:len(NAMES)] > 0.5).sum())
+    L = []
+    for j, n in enumerate(NAMES):
+        L.append(f"{SHORT[n]} & " + " & ".join(f"{P[m][j]:.2f}" for m, _ in have) + " \\\\")
+    L.append("Random intercept & " + " & ".join(f"{P[m][-1]:.2f}" for m, _ in have) + " \\\\")
+    L.append("\\midrule")
+    L.append("Random covariates & " + " & ".join(str(nr[m]) for m, _ in have) + " \\\\")
+    sets = {m: tuple(np.nonzero(Pd[m] > 0.5)[0]) for m, _ in have}
+    L.append("Dispersion effects & " + " & ".join(str(len(sets[m])) for m, _ in have) + " \\\\")
+    common = set.intersection(*[set(v) for v in sets.values()])
+    print("dispersion effects by setting:", {m: [NAMES[k] for k in v] for m, v in sets.items()},
+          "common:", [NAMES[k] for k in sorted(common)])
+    L.append("LPD, 2019 & " + " & ".join(f"{lpd[m]:,.1f}".replace(",", "{,}").replace("-", "$-$") for m, _ in have)
+             + " \\\\")
+    (tabdir / "uk_sensitivity_rows.tex").write_text("\n".join(L) + "\n")
+    (tabdir / "uk_sensitivity_head.tex").write_text(" & ".join(["Candidate"] + [lab for _, lab in have]) + " \\\\\n")
+    return {m: (nr[m], lpd[m]) for m, _ in have}
+
+
 def _split_rhat_ess(chains):
     """Split-chain R-hat and a simple effective sample size (initial positive sequence) for
     a list of 1-D chains of equal length."""
@@ -357,6 +391,9 @@ def main():
     figure_states(recs, figdir)
     if any(k[0] == "M6" for k in recs):
         table_estimates(res, tabdir)
+    sens = table_sensitivity(recs, res, tabdir)
+    if sens:
+        print("sensitivity:", sens)
     pr = table_predict(recs, res, tabdir)
     print(pr.round(3).to_string(index=False))
     pr.to_csv(res / "predict_summary.csv", index=False)
